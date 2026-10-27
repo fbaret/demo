@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Prodélien carte</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout : carte plein écran en accueil (façon Airbnb), barre flottante en haut, bascule Carte/Liste en bas, fiche de sélection en panneau */
+:root{
+ --bg:#eef0e8;--land:#f8f8f2;--line:#d3d8c9;--surface:#ffffff;--fg:#1e271f;--muted:#5f6b5e;
+ --prod:#2f6b3a;--vente:#b4621f;--web:#b4621f;--halo:rgba(255,255,255,.9);--shadow:0 6px 24px rgba(30,40,30,.16);
+ --display:"Fraunces",Georgia,serif;--body:"Public Sans",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+ --bg:#10150f;--land:#1a2119;--line:#2d382c;--surface:#1f271e;--fg:#e5ebe0;--muted:#9ba798;
+ --prod:#86c98a;--vente:#e8a464;--web:#e8a464;--halo:rgba(16,21,15,.9);--shadow:0 6px 24px rgba(0,0,0,.5);color-scheme:dark}}
+:root[data-theme="dark"]{
+ --bg:#10150f;--land:#1a2119;--line:#2d382c;--surface:#1f271e;--fg:#e5ebe0;--muted:#9ba798;
+ --prod:#86c98a;--vente:#e8a464;--web:#e8a464;--halo:rgba(16,21,15,.9);--shadow:0 6px 24px rgba(0,0,0,.5);color-scheme:dark}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px;overflow:hidden}
+#app{position:relative;height:100%}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+canvas.hover{cursor:pointer}
+.float{position:absolute;z-index:5}
+.top{top:12px;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.top>*{pointer-events:auto}
+.bar{display:flex;gap:8px;align-items:center;background:var(--surface);border-radius:999px;box-shadow:var(--shadow);padding:6px 6px 6px 16px;max-width:620px}
+.brand{font-family:var(--display);font-size:18px;white-space:nowrap}
+.bar input{flex:1;min-width:0;border:0;background:transparent;color:var(--fg);font:inherit;padding:8px 4px;outline:none}
+.bar .go{border:0;background:var(--prod);color:var(--surface);border-radius:999px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none;max-width:100%}
+.chip{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:6px 11px;font:inherit;font-size:13px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--surface);border-color:var(--fg)}
+.chip .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0}
+.sep{flex:none;width:1px;background:var(--line);margin:4px 2px}
+.toggle{left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));border:0;background:var(--fg);color:var(--surface);border-radius:999px;padding:12px 20px;font:inherit;font-weight:600;box-shadow:var(--shadow);cursor:pointer;white-space:nowrap}
+.legend{right:max(12px,env(safe-area-inset-right,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--surface);border-radius:10px;padding:8px 10px;box-shadow:var(--shadow);font-size:12px;color:var(--muted);display:grid;gap:3px}
+.legend b{color:var(--fg);font-weight:500}
+.sw{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px}
+.sw.p{border-radius:50%;background:var(--prod)}.sw.v{background:var(--vente);transform:rotate(45deg) scale(.85)}
+.card{left:max(12px,env(safe-area-inset-left,0px));bottom:calc(76px + env(safe-area-inset-bottom,0px));width:min(380px,calc(100% - 24px));max-height:52%;overflow:auto;background:var(--surface);border-radius:14px;box-shadow:var(--shadow);padding:16px;display:grid;gap:10px}
+.card h2{font-family:var(--display);font-size:20px;margin:0;line-height:1.2;text-wrap:balance}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+.eyebrow.p{color:var(--prod)}.eyebrow.v{color:var(--vente)}
+.meta{color:var(--muted);font-size:13px}
+.close{position:absolute;top:10px;right:10px;border:0;background:transparent;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;padding:4px 8px}
+.links{display:grid;gap:2px;margin:0;padding:0;list-style:none}
+.links button{width:100%;text-align:left;border:0;background:transparent;color:var(--fg);font:inherit;padding:7px 8px;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.links button:hover{background:var(--bg)}
+.km{font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tag{display:inline-block;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;margin-right:4px}
+.list{position:absolute;inset:0;z-index:4;background:var(--bg);overflow:auto;padding-top:120px;padding-bottom:90px}
+.list .inner{max-width:900px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:12px}
+.list h2{font-family:var(--display);font-size:22px;margin:0}
+.rows{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.row{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:left;font:inherit;color:var(--fg);cursor:pointer;display:grid;gap:4px;min-width:0}
+.row:hover{border-color:var(--prod)}
+.row b{font-weight:600}
+.more{justify-self:center;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:9px 16px;font:inherit;cursor:pointer}
+.hint{position:absolute;z-index:3;pointer-events:none;background:var(--surface);color:var(--fg);border-radius:8px;padding:5px 9px;font-size:12px;box-shadow:var(--shadow);white-space:nowrap}
+.zoom{right:max(12px,env(safe-area-inset-right,0px));top:132px;display:grid;background:var(--surface);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}
+.zoom button{border:0;background:transparent;color:var(--fg);width:38px;height:38px;font-size:18px;cursor:pointer}
+.zoom button+button{border-top:1px solid var(--line)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--prod);outline-offset:2px}
+@media (max-width:640px){.legend{display:none}.card{bottom:calc(76px + env(safe-area-inset-bottom,0px));max-height:45%}.brand{display:none}}
+</style>
+</head>
+<body>
+
+<div id="app">
+ <canvas id="map" aria-label="Carte des producteurs et points de vente de Haute-Garonne"></canvas>
+ <div class="hint" id="hint" hidden></div>
+
+ <div class="float top">
+  <form class="bar" id="search" role="search">
+   <span class="brand">Prodélien</span>
+   <input id="q" list="communes" placeholder="Commune, ex. Muret, Revel, Saint-Gaudens" autocomplete="off" aria-label="Rechercher une commune">
+   <datalist id="communes"></datalist>
+   <button class="go" type="submit">Rechercher</button>
+  </form>
+  <div class="chips" id="chips"></div>
+ </div>
+
+ <div class="float zoom"><button id="zin" aria-label="Zoomer">+</button><button id="zout" aria-label="Dézoomer">−</button></div>
+
+ <div class="float legend">
+  <span><i class="sw p"></i><b>Producteur</b> · lieu d’origine</span>
+  <span><i class="sw v"></i><b>Point de vente</b> · partagé</span>
+  <span>Chiffre = regroupement, cliquer pour zoomer</span>
+  <span>Données fictives · fond IGN/Etalab simplifié</span>
+ </div>
+
+ <section class="float card" id="card" hidden></section>
+
+ <section class="list" id="list" hidden><div class="inner" id="listInner"></div></section>
+
+ <button class="float toggle" id="toggle">Afficher la liste</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="data.js"></script>
+<script>
+const D=window.POC_DATA;
+const TYPES={marche:"Marché",amap:"AMAP",epicerie:"Épicerie",super:"Supermarché",coop:"Coopérative"};
+const CATS=[...new Set(D.prods.flatMap(p=>p.c))].sort((a,b)=>a.localeCompare(b,"fr"));
+const byId=new Map();D.prods.forEach(p=>{p.kind="p";byId.set(p.id,p)});D.points.forEach(v=>{v.kind="v";v.prods=[];byId.set(v.id,v)});
+D.prods.forEach(p=>p.l.forEach(id=>byId.get(id).prods.push(p.id)));
+
+const canvas=document.getElementById("map"),ctx=canvas.getContext("2d");
+let W=0,H=0,dpr=1,proj,t=d3.zoomIdentity,sel=null,mode="map",listLimit=48;
+const state={layer:"all",cats:new Set(),types:new Set()};
+let C={};function readColors(){const s=getComputedStyle(document.documentElement);["bg","land","line","fg","muted","prod","vente","web","halo","surface"].forEach(k=>C[k]=s.getPropertyValue("--"+k).trim())}
+readColors();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>{readColors();draw()});
+new MutationObserver(()=>{readColors();draw()}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+
+// Projection unique, fixée au premier affichage ; le zoom est une transformation d3
+const geo={type:"FeatureCollection",features:D.communes.map(c=>({type:"Feature",properties:{n:c.n},geometry:{type:"MultiPolygon",coordinates:c.r.map(r=>[r])}}))};
+function size(){const r=canvas.getBoundingClientRect();W=r.width;H=r.height;dpr=window.devicePixelRatio||1;canvas.width=W*dpr;canvas.height=H*dpr}
+size();
+proj=d3.geoMercator().fitExtent([[20,140],[W-20,H-90]],geo);
+const path=d3.geoPath(proj,ctx);
+D.communes.forEach(c=>{c.xy=proj(c.c)});
+D.prods.forEach(p=>p.xy=proj(p.p));D.points.forEach(v=>v.xy=proj(v.p));
+const LABELS=new Set(["Toulouse","Muret","Saint-Gaudens","Colomiers","Blagnac","Villefranche-de-Lauragais","Revel","Bagnères-de-Luchon","Carbonne","Grenade","Fronton","L'Isle-en-Dodon","Caraman","Cazères","Montréjeau","Rieumes","Auterive","Balma","Tournefeuille","Saint-Orens-de-Gameville","Castanet-Tolosan","Villemur-sur-Tarn","Aspet","Boulogne-sur-Gesse","Nailloux"]);
+const labelled=D.communes.filter(c=>LABELS.has(c.n));
+const KM=(a,b)=>{const R=6371,toR=Math.PI/180,dl=(b[1]-a[1])*toR,dg=(b[0]-a[0])*toR;const h=Math.sin(dl/2)**2+Math.cos(a[1]*toR)*Math.cos(b[1]*toR)*Math.sin(dg/2)**2;return 2*R*Math.asin(Math.sqrt(h))};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function visibleProd(p){return state.layer!=="v"&&(!state.cats.size||p.c.some(c=>state.cats.has(c)))}
+function visibleVente(v){return state.layer!=="p"&&(!state.types.size||state.types.has(v.t))&&(!state.cats.size||v.prods.some(id=>visibleProd(byId.get(id))))}
+
+// Regroupement en grille ancrée sur la carte (pas sur l'écran) : les groupes ne dépendent que du zoom
+// et des filtres. Un déplacement réutilise le cache ; seul un changement de zoom ou de filtre recalcule.
+const clusterCache=new Map();
+function cluster(items,cell,key){
+ const lvl=zoomLevel();
+ const ck=key+"|"+lvl+"|"+filterSig();
+ let groups=clusterCache.get(ck);
+ if(!groups){
+  const cw=cell/Math.pow(2,lvl),g=new Map();
+  for(const it of items){const k=Math.floor(it.xy[0]/cw)+":"+Math.floor(it.xy[1]/cw);let c=g.get(k);if(!c){c={items:[],x:0,y:0};g.set(k,c)}c.items.push(it);c.x+=it.xy[0];c.y+=it.xy[1]}
+  groups=[...g.values()].map(c=>({items:c.items,wx:c.x/c.items.length,wy:c.y/c.items.length}));
+  if(clusterCache.size>40)clusterCache.clear();
+  clusterCache.set(ck,groups);window.__clusterRuns=(window.__clusterRuns||0)+1;
+ }
+ return groups.map(c=>{const[x,y]=t.apply([c.wx,c.wy]);return{items:c.items,x,y}}).filter(c=>c.x>-40&&c.y>-40&&c.x<W+40&&c.y<H+40)}
+function zoomLevel(){return Math.max(0,Math.floor(Math.log2(t.k)+1e-9))}
+function filterSig(){return state.layer+"/"+[...state.cats].sort()+"/"+[...state.types].sort()+"/"+(sel?sel.id:"")}
+
+let drawn=[];// cibles cliquables de l'image courante
+function draw(){
+ ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H);
+ ctx.save();ctx.translate(t.x,t.y);ctx.scale(t.k,t.k);
+ ctx.beginPath();path(geo);ctx.fillStyle=C.land;ctx.fill();
+ ctx.lineWidth=0.6/t.k;ctx.strokeStyle=C.line;ctx.stroke();ctx.restore();
+ // libellés des communes repères
+ ctx.font=`500 ${t.k>4?12:11}px "Public Sans",system-ui,sans-serif`;ctx.textAlign="center";
+ const lab=t.k>5?D.communes.filter(c=>{const[x,y]=t.apply(c.xy);return x>0&&y>0&&x<W&&y<H}).slice(0,t.k>9?400:120):labelled;
+ if(t.k>5){/* à fort zoom, tous les noms visibles mais espacés */}
+ const placed=[];
+ for(const c of lab){const[x,y]=t.apply(c.xy);if(placed.some(p=>Math.abs(p[0]-x)<80&&Math.abs(p[1]-y)<16))continue;placed.push([x,y]);
+  ctx.lineWidth=3;ctx.strokeStyle=C.halo;ctx.strokeText(c.n,x,y-8);ctx.fillStyle=C.muted;ctx.fillText(c.n,x,y-8)}
+
+ drawn=[];
+ const web=sel?webOf(sel):null;
+ const dim=!!sel;
+ // Paliers de zoom (puissances de 2, comme les niveaux d'une carte) : les groupes ne changent qu'au franchissement d'un palier
+ const cell=zoomLevel()<3?40:0;
+ const prods=D.prods.filter(p=>visibleProd(p)&&!(web&&web.has(p.id)));
+ const ventes=D.points.filter(v=>visibleVente(v)&&!(web&&web.has(v.id)));
+ ctx.globalAlpha=dim?0.22:1;
+ drawGroup(ventes,cell,"v");drawGroup(prods,cell,"p");
+ ctx.globalAlpha=1;
+ if(sel)drawWeb(sel,web);
+}
+function drawGroup(items,cell,kind){
+ const col=kind==="p"?C.prod:C.vente;
+ const groups=cell?cluster(items,cell,kind):items.map(it=>{const[x,y]=t.apply(it.xy);return{items:[it],x,y}}).filter(g=>g.x>-20&&g.y>-20&&g.x<W+20&&g.y<H+20);
+ for(const g of groups){
+  if(g.items.length===1){marker(g.x,g.y,kind,col,6);drawn.push({x:g.x,y:g.y,r:9,item:g.items[0]})}
+  else{const n=g.items.length,r=Math.min(24,10+Math.sqrt(n)*2.6);
+   ctx.beginPath();if(kind==="p")ctx.arc(g.x,g.y,r,0,7);else{ctx.save();ctx.translate(g.x,g.y);ctx.rotate(Math.PI/4);ctx.rect(-r*.8,-r*.8,r*1.6,r*1.6);ctx.restore()}
+   ctx.fillStyle=col;ctx.fill();ctx.lineWidth=2.5;ctx.strokeStyle=C.surface;ctx.stroke();
+   ctx.fillStyle=C.surface;ctx.font=`600 ${n>99?11:12}px "IBM Plex Mono",ui-monospace,monospace`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(n,g.x,g.y+0.5);ctx.textBaseline="alphabetic";
+   drawn.push({x:g.x,y:g.y,r:r+2,cluster:g})}
+ }
+}
+function marker(x,y,kind,col,r,ring){
+ ctx.beginPath();if(kind==="p")ctx.arc(x,y,r,0,7);else{ctx.save();ctx.translate(x,y);ctx.rotate(Math.PI/4);ctx.rect(-r*.85,-r*.85,r*1.7,r*1.7);ctx.restore()}
+ ctx.fillStyle=col;ctx.fill();ctx.lineWidth=ring?3:1.8;ctx.strokeStyle=C.surface;ctx.stroke();
+ if(ring){ctx.beginPath();ctx.arc(x,y,r+5,0,7);ctx.lineWidth=2;ctx.strokeStyle=col;ctx.stroke()}
+}
+function webOf(it){const s=new Set([it.id]);(it.kind==="p"?it.l:it.prods).forEach(id=>s.add(id));return s}
+// Toile : arcs du centre (producteur ou point de vente) vers chaque lien
+function drawWeb(it,web){
+ const [cx,cy]=t.apply(it.xy);
+ const others=[...web].filter(id=>id!==it.id).map(id=>byId.get(id));
+ ctx.lineCap="round";
+ for(const o of others){const[x,y]=t.apply(o.xy);const mx=(cx+x)/2,my=(cy+y)/2,dx=x-cx,dy=y-cy,len=Math.hypot(dx,dy)||1,bend=Math.min(60,len*.18);
+  ctx.beginPath();ctx.moveTo(cx,cy);ctx.quadraticCurveTo(mx-dy/len*bend,my+dx/len*bend,x,y);
+  ctx.lineWidth=5;ctx.strokeStyle=C.halo;ctx.stroke();ctx.lineWidth=2;ctx.strokeStyle=C.web;ctx.setLineDash(it.kind==="v"?[5,4]:[]);ctx.stroke();ctx.setLineDash([])}
+ for(const o of others){const[x,y]=t.apply(o.xy);marker(x,y,o.kind,o.kind==="p"?C.prod:C.vente,7);drawn.push({x,y,r:10,item:o})}
+ // noms des extrémités de la toile
+ ctx.font='500 12px "Public Sans",system-ui,sans-serif';ctx.textAlign="left";
+ if(others.length<=12)for(const o of others){const[x,y]=t.apply(o.xy);ctx.lineWidth=3.5;ctx.strokeStyle=C.halo;ctx.strokeText(o.n,x+11,y+4);ctx.fillStyle=C.fg;ctx.fillText(o.n,x+11,y+4)}
+ marker(cx,cy,it.kind,it.kind==="p"?C.prod:C.vente,9,true);
+ if(it.kind==="p"&&it.d){ctx.font='600 11px "Public Sans",system-ui,sans-serif';ctx.textAlign="center";ctx.lineWidth=3.5;ctx.strokeStyle=C.halo;ctx.strokeText("vente sur place",cx,cy+28);ctx.fillStyle=C.prod;ctx.fillText("vente sur place",cx,cy+28)}
+ drawn.push({x:cx,y:cy,r:12,item:it});
+}
+
+let raf=0;const redraw=()=>{if(!raf)raf=requestAnimationFrame(()=>{raf=0;draw()})};
+const zoom=d3.zoom().scaleExtent([1,40]).translateExtent([[-200,-200],[W+200,H+200]]).on("zoom",e=>{t=e.transform;redraw()});
+const csel=d3.select(canvas).call(zoom).on("dblclick.zoom",null);
+
+function hit(x,y){let best=null,bd=1e9;for(let i=drawn.length-1;i>=0;i--){const d=drawn[i],dd=Math.hypot(d.x-x,d.y-y);if(dd<d.r&&dd<bd){best=d;bd=dd}}return best}
+let down=null;
+canvas.addEventListener("pointerdown",e=>{down=[e.offsetX,e.offsetY]});
+canvas.addEventListener("click",e=>{if(down&&Math.hypot(e.offsetX-down[0],e.offsetY-down[1])>5)return;const h=hit(e.offsetX,e.offsetY);
+ if(!h){if(sel){select(null)}return}
+ if(h.cluster){const it=h.cluster.items;const b=bounds(it.map(i=>i.xy));flyTo(b,Math.max(t.k*2.2,2))}
+ else select(h.item,false)});
+const hint=document.getElementById("hint");
+canvas.addEventListener("pointermove",e=>{const h=hit(e.offsetX,e.offsetY);canvas.classList.toggle("hover",!!h);
+ if(h&&e.pointerType==="mouse"){hint.hidden=false;hint.textContent=h.cluster?`${h.cluster.items.length} ${h.cluster.items[0].kind==="p"?"producteurs":"points de vente"}`:h.item.n;hint.style.left=(e.offsetX+14)+"px";hint.style.top=(e.offsetY+10)+"px"}else hint.hidden=true});
+canvas.addEventListener("pointerleave",()=>hint.hidden=true);
+
+function bounds(xys){const xs=xys.map(p=>p[0]),ys=xys.map(p=>p[1]);return[[Math.min(...xs),Math.min(...ys)],[Math.max(...xs),Math.max(...ys)]]}
+function flyTo([[x0,y0],[x1,y1]],minK=1,offset=true){
+ const pad=offset&&sel&&W>640?{l:400,r:60,t:150,b:90}:{l:40,r:40,t:150,b:sel?Math.min(H*.5,340):90};
+ const k=Math.max(minK,Math.min(40,Math.min((W-pad.l-pad.r)/Math.max(x1-x0,1),(H-pad.t-pad.b)/Math.max(y1-y0,1))));
+ const cx=(x0+x1)/2,cy=(y0+y1)/2,sx=pad.l+(W-pad.l-pad.r)/2,sy=pad.t+(H-pad.t-pad.b)/2;
+ csel.transition().duration(matchMedia("(prefers-reduced-motion: reduce)").matches?0:650).call(zoom.transform,d3.zoomIdentity.translate(sx-cx*k,sy-cy*k).scale(k))}
+
+// Fiche de sélection
+const card=document.getElementById("card");
+function select(it,fly=true){sel=it;
+ if(!it){card.hidden=true;draw();return}
+ const web=webOf(it);const xy=[...web].map(id=>byId.get(id).xy);
+ if(fly||xy.length>1){const b=bounds(xy);const k=Math.min(Math.max(t.k,3),40);flyTo(b,xy.length>1?1:k)}
+ card.innerHTML=it.kind==="p"?prodCard(it):venteCard(it);card.hidden=false;
+ card.querySelector(".close").onclick=()=>select(null);
+ card.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>select(byId.get(b.dataset.go)));
+ draw()}
+function prodCard(p){const links=p.l.map(id=>byId.get(id)).sort((a,b)=>KM(p.p,a.p)-KM(p.p,b.p));
+ return `<button class="close" aria-label="Fermer">×</button>
+ <span class="eyebrow p">Producteur${p.pr?" · premium":""}</span><h2>${esc(p.n)}</h2>
+ <div class="meta">Origine : ${esc(p.v)}${p.d?" · vente sur place":""}</div>
+ <div>${p.c.map(c=>`<span class="tag">${esc(c)}</span>`).join("")}</div>
+ <div><b>${links.length} point${links.length>1?"s":""} de vente</b>${!p.pr?` <span class="meta">(formule gratuite, 2 max)</span>`:""}</div>
+ ${links.length?`<ul class="links">${links.map(v=>`<li><button data-go="${v.id}"><span>${esc(v.n)} <span class="meta">· ${TYPES[v.t]}</span></span><span class="km">${KM(p.p,v.p).toFixed(1)} km</span></button></li>`).join("")}</ul>`:`<div class="meta">Aucun point de vente référencé${p.d?" : uniquement sur place.":"."}</div>`}`}
+function venteCard(v){const ps=v.prods.map(id=>byId.get(id)).sort((a,b)=>KM(v.p,a.p)-KM(v.p,b.p));
+ return `<button class="close" aria-label="Fermer">×</button>
+ <span class="eyebrow v">${TYPES[v.t]}</span><h2>${esc(v.n)}</h2>
+ <div class="meta">${esc(v.v)} · lieu partagé par ${ps.length} producteur${ps.length>1?"s":""}</div>
+ ${ps.length?`<ul class="links">${ps.map(p=>`<li><button data-go="${p.id}"><span>${esc(p.n)} <span class="meta">· ${esc(p.c[0])}</span></span><span class="km">${KM(v.p,p.p).toFixed(0)} km</span></button></li>`).join("")}</ul>`:`<div class="meta">Aucun producteur référencé ici.</div>`}`}
+
+// Filtres
+const chips=document.getElementById("chips");
+function renderChips(){
+ const L=[["all","Tout"],["p","Producteurs"],["v","Points de vente"]];
+ chips.innerHTML=L.map(([k,l])=>`<button class="chip" data-layer="${k}" aria-pressed="${state.layer===k}">${k==="p"?'<i class="dot" style="background:var(--prod)"></i>':k==="v"?'<i class="dot" style="background:var(--vente);border-radius:2px"></i>':""}${l}</button>`).join("")
+ +`<span class="sep"></span>`+CATS.map(c=>`<button class="chip" data-cat="${esc(c)}" aria-pressed="${state.cats.has(c)}">${esc(c)}</button>`).join("")
+ +`<span class="sep"></span>`+Object.entries(TYPES).map(([k,l])=>`<button class="chip" data-type="${k}" aria-pressed="${state.types.has(k)}">${l}</button>`).join("");
+ chips.querySelectorAll("[data-layer]").forEach(b=>b.onclick=()=>{state.layer=b.dataset.layer;update()});
+ chips.querySelectorAll("[data-cat]").forEach(b=>b.onclick=()=>{const c=b.dataset.cat;state.cats.has(c)?state.cats.delete(c):state.cats.add(c);update()});
+ chips.querySelectorAll("[data-type]").forEach(b=>b.onclick=()=>{const c=b.dataset.type;state.types.has(c)?state.types.delete(c):state.types.add(c);if(state.layer==="p")state.layer="all";update()})}
+function update(){renderChips();draw();if(mode==="list")renderList()}
+
+// Recherche de commune
+document.getElementById("communes").innerHTML=D.communes.map(c=>`<option value="${esc(c.n)}">`).join("");
+document.getElementById("search").addEventListener("submit",e=>{e.preventDefault();const q=document.getElementById("q").value.trim().toLowerCase();
+ const c=D.communes.find(c=>c.n.toLowerCase()===q)||D.communes.find(c=>c.n.toLowerCase().startsWith(q));if(!c)return;
+ const b=d3.geoPath(proj).bounds({type:"MultiPolygon",coordinates:c.r.map(r=>[r])});
+ if(mode==="list")setMode("map");select(null);flyTo([[b[0][0]-30,b[0][1]-30],[b[1][0]+30,b[1][1]+30]],2,false)});
+
+// Mode liste : ce qui est visible dans la zone actuelle de la carte, comme Airbnb
+const list=document.getElementById("list"),listInner=document.getElementById("listInner"),toggle=document.getElementById("toggle");
+function inView(it){const[x,y]=t.apply(it.xy);return x>=0&&y>=0&&x<=W&&y<=H}
+function renderList(){
+ const center=t.invert([W/2,H/2]);
+ const showP=state.layer!=="v",showV=state.layer!=="p";
+ let items=[...(showP?D.prods.filter(p=>visibleProd(p)&&inView(p)):[]),...(showV?D.points.filter(v=>visibleVente(v)&&inView(v)):[])];
+ items.sort((a,b)=>Math.hypot(a.xy[0]-center[0],a.xy[1]-center[1])-Math.hypot(b.xy[0]-center[0],b.xy[1]-center[1]));
+ const np=items.filter(i=>i.kind==="p").length,nv=items.length-np;
+ listInner.innerHTML=`<h2>${np} producteur${np>1?"s":""} et ${nv} point${nv>1?"s":""} de vente dans cette zone</h2>
+ <div class="meta">La liste suit la zone affichée sur la carte, du centre vers les bords. Déplacez la carte pour changer de zone.</div>
+ <div class="rows">${items.slice(0,listLimit).map(i=>i.kind==="p"?
+  `<button class="row" data-id="${i.id}"><span class="eyebrow p">Producteur · ${esc(i.v)}</span><b>${esc(i.n)}</b><span class="meta">${i.c.join(", ")} · ${i.l.length} point${i.l.length>1?"s":""} de vente${i.d?" · sur place":""}</span></button>`:
+  `<button class="row" data-id="${i.id}"><span class="eyebrow v">${TYPES[i.t]} · ${esc(i.v)}</span><b>${esc(i.n)}</b><span class="meta">${i.prods.length} producteur${i.prods.length>1?"s":""}</span></button>`).join("")}</div>
+ ${items.length>listLimit?`<button class="more" id="more">Afficher ${Math.min(48,items.length-listLimit)} de plus</button>`:""}
+ ${!items.length?`<p class="meta">Rien dans cette zone avec ces filtres. Dézoomez la carte ou retirez un filtre.</p>`:""}`;
+ listInner.querySelectorAll("[data-id]").forEach(b=>b.onclick=()=>{setMode("map");select(byId.get(b.dataset.id))});
+ const m=document.getElementById("more");if(m)m.onclick=()=>{listLimit+=48;renderList()}}
+function setMode(m){mode=m;list.hidden=m!=="list";toggle.textContent=m==="list"?"Afficher la carte":"Afficher la liste";if(m==="list"){listLimit=48;card.hidden=true;renderList();list.scrollTop=0}else if(sel)card.hidden=false}
+toggle.onclick=()=>setMode(mode==="map"?"list":"map");
+document.getElementById("zin").onclick=()=>csel.transition().duration(250).call(zoom.scaleBy,1.8);
+document.getElementById("zout").onclick=()=>csel.transition().duration(250).call(zoom.scaleBy,1/1.8);
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&sel)select(null)});
+window.addEventListener("resize",()=>{size();draw()});
+
+renderChips();
+// Ouverture : vue d'ensemble légèrement centrée sur l'agglomération toulousaine
+const tls=proj([1.444,43.604]);t=d3.zoomIdentity.translate(W/2-tls[0]*1.6,(H+60)/2-tls[1]*1.6).scale(1.6);csel.call(zoom.transform,t);
+draw();
+</script>
+</body>
+</html>
