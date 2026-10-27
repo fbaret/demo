@@ -66,8 +66,15 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--prod);outline-o
   <button class="chip" data-layer="v" aria-pressed="false"><i class="dot" style="background:var(--vente);border-radius:2px"></i>Points de vente</button>
   <span class="status" id="status">300 000 producteurs · 80 000 points de vente · fictifs</span>
  </div>
- <div class="diag" id="diag" hidden></div>
+ <div class="diag" id="diag">démarrage…</div>
 </div>
+<script>
+// Témoin d'erreur posé avant tout autre script : visible même si le script principal s'arrête
+(function(){var el=document.getElementById("diag");
+ function show(t){el.hidden=false;el.className="diag bad";el.textContent=(el.textContent?el.textContent+" · ":"")+"⚠ "+t}
+ window.addEventListener("error",function(e){show((e.message||"erreur")+(e.lineno?" (ligne "+e.lineno+")":"")+(e.filename&&e.filename.indexOf("maplibre")>=0?" [maplibre]":""))});
+ window.addEventListener("unhandledrejection",function(e){show(String(e.reason&&e.reason.message||e.reason))});})();
+</script>
 <div class="float msg" id="msg" hidden></div>
 <section class="float card" id="card" hidden></section>
 <section class="list" id="list" hidden><div class="inner" id="listInner"></div></section>
@@ -236,6 +243,7 @@ function renderList(){const b=map.getBounds(),c=map.getCenter().toArray(),inB=(l
  const m=document.getElementById("more");if(m)m.onclick=()=>{listLimit+=48;renderList()}}
 function setMode(m){mode=m;list.hidden=m!=="list";toggle.textContent=m==="list"?"Afficher la carte":"Afficher la liste";if(m==="list"){listLimit=48;card.hidden=true;renderList();list.scrollTop=0}else if(sel)card.hidden=false}
 toggle.onclick=()=>setMode(mode==="map"?"list":"map");
+diag("script prêt");
 </script>
 </body>
 </html>
