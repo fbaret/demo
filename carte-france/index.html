@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Prodélien France</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Carte France sur Plan IGN gris : regroupements précalculés par palier (5 à 12), individuels à partir de 13,
+   chargés par zone visible uniquement. Mêmes parcours que la démo Haute-Garonne. */
+:root{--bg:#eef0e8;--surface:#fff;--fg:#1e271f;--muted:#5f6b5e;--line:#d3d8c9;--prod:#2f6b3a;--vente:#b4621f;--shadow:0 6px 24px rgba(30,40,30,.16);
+ --display:"Fraunces",Georgia,serif;--body:"Public Sans",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px;overflow:hidden}
+#map{position:absolute;inset:0}
+.float{position:absolute;z-index:5}
+.top{top:calc(12px + env(safe-area-inset-top,0px));left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.top>*{pointer-events:auto}
+.bar{display:flex;gap:8px;align-items:center;background:var(--surface);border-radius:999px;box-shadow:var(--shadow);padding:6px 6px 6px 16px;max-width:560px}
+.brand{font-family:var(--display);font-size:18px;white-space:nowrap}
+.bar input{flex:1;min-width:0;border:0;background:transparent;color:var(--fg);font:inherit;font-size:16px;padding:8px 4px;outline:none}
+.go{border:0;background:var(--prod);color:#fff;border-radius:999px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;align-items:center}
+.chip{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:6px 11px;font:inherit;font-size:13px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--surface);border-color:var(--fg)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+.status{flex:none;font-size:12px;color:var(--muted);background:var(--surface);border-radius:999px;padding:5px 10px;box-shadow:0 1px 3px rgba(0,0,0,.08);font-variant-numeric:tabular-nums}
+.toggle{left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));border:0;background:var(--fg);color:var(--surface);border-radius:999px;padding:12px 20px;font:inherit;font-weight:600;box-shadow:var(--shadow);cursor:pointer;white-space:nowrap}
+.card{left:max(12px,env(safe-area-inset-left,0px));bottom:calc(80px + env(safe-area-inset-bottom,0px));width:min(380px,calc(100% - 24px));max-height:50%;overflow:auto;background:var(--surface);border-radius:14px;box-shadow:var(--shadow);padding:16px;display:grid;gap:10px;box-sizing:border-box}
+.card h2{font-family:var(--display);font-size:20px;margin:0;line-height:1.2;padding-right:24px}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+.eyebrow.p{color:var(--prod)}.eyebrow.v{color:var(--vente)}
+.meta{color:var(--muted);font-size:13px}
+.close{position:absolute;top:10px;right:10px;border:0;background:transparent;color:var(--muted);font-size:22px;cursor:pointer}
+.links{display:grid;gap:2px;margin:0;padding:0;list-style:none}
+.links button{width:100%;text-align:left;border:0;background:transparent;color:var(--fg);font:inherit;padding:7px 8px;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.links button:hover{background:var(--bg)}
+.km{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap}
+.tag{display:inline-block;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;margin-right:4px}
+.list{position:absolute;inset:0;z-index:4;background:var(--bg);overflow:auto;padding:130px 16px 90px}
+.list .inner{max-width:900px;margin:0 auto;display:grid;gap:12px}
+.list h2{font-family:var(--display);font-size:22px;margin:0}
+.rows{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.row{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:left;font:inherit;color:var(--fg);cursor:pointer;display:grid;gap:4px}
+.more,.zoomhere{justify-self:start;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:9px 16px;font:inherit;cursor:pointer}
+.msg{left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:140px;background:var(--surface);border:1px solid var(--vente);border-radius:10px;padding:12px;max-width:520px}
+button:focus-visible,input:focus-visible{outline:2px solid var(--prod);outline-offset:2px}
+@media (max-width:640px){.brand{display:none}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="float top">
+ <form class="bar" id="search" role="search">
+  <span class="brand">Prodélien</span>
+  <input id="q" placeholder="Une commune, ex. Annecy, Dijon" autocomplete="off" aria-label="Rechercher une commune">
+  <button class="go" type="submit">Rechercher</button>
+ </form>
+ <div class="chips">
+  <button class="chip" data-layer="all" aria-pressed="true">Tout</button>
+  <button class="chip" data-layer="p" aria-pressed="false"><i class="dot" style="background:var(--prod)"></i>Producteurs</button>
+  <button class="chip" data-layer="v" aria-pressed="false"><i class="dot" style="background:var(--vente);border-radius:2px"></i>Points de vente</button>
+  <span class="status" id="status">300 000 producteurs · 80 000 points de vente · fictifs</span>
+ </div>
+</div>
+<div class="float msg" id="msg" hidden></div>
+<section class="float card" id="card" hidden></section>
+<section class="list" id="list" hidden><div class="inner" id="listInner"></div></section>
+<button class="float toggle" id="toggle">Afficher la liste</button>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+const STYLE="https://data.geopf.fr/annexes/ressources/vectorTiles/styles/PLAN.IGN/gris.json";
+const CATS=["Bières","Céramique","Fromages","Fruits","Laine","Légumes","Miel","Pain","Plantes","Savons","Viandes","Vins"];
+const TYPES=["Marché","AMAP","Épicerie","Supermarché","Coopérative"];
+const R=20037508.342789244;
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const KM=(a,b)=>{const r=Math.PI/180,dl=(b[1]-a[1])*r,dg=(b[0]-a[0])*r;const h=Math.sin(dl/2)**2+Math.cos(a[1]*r)*Math.cos(b[1]*r)*Math.sin(dg/2)**2;return 12742*Math.asin(Math.sqrt(h))};
+const fmt=n=>n>=10000?Math.round(n/1000)+"k":n>=1000?(n/1000).toFixed(1).replace(".",",")+"k":String(n);
+const fc=f=>({type:"FeatureCollection",features:f});
+const status=document.getElementById("status"),msg=document.getElementById("msg");
+function showMsg(t){msg.textContent=t;msg.hidden=!t}
+
+// ---------- Chargement par zone ----------
+let IDX=null,layerMode="all",sel=null,mode="map",listLimit=48,gen=0;
+const cache=new Map();
+function getJSON(url){if(!cache.has(url))cache.set(url,fetch(url).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).catch(e=>{cache.delete(url);throw e}));return cache.get(url)}
+function lon2t(lon,z){return Math.floor((lon+180)/360*2**z)}
+function lat2t(lat,z){const r=lat*Math.PI/180;return Math.floor((1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*2**z)}
+function tilesInView(z){const b=map.getBounds();const x0=lon2t(b.getWest(),z),x1=lon2t(b.getEast(),z),y0=lat2t(Math.min(85,b.getNorth()),z),y1=lat2t(Math.max(-85,b.getSouth()),z);const out=[];for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++)out.push(x+"_"+y);return out}
+function level(){const z=Math.floor(map.getZoom()+1e-6);return z>=13?"i":Math.max(5,Math.min(12,z))}
+let current={level:null,p:[],v:[]};
+
+async function refresh(){
+ if(!IDX)return;const g=++gen,lv=level();
+ let urls;
+ if(lv==="i"){const have=new Set(IDX.i);urls=tilesInView(IDX.indivZ).filter(k=>have.has(k)).map(k=>`data/i/${k}.json`)}
+ else{const have=new Set(IDX.c[lv]||[]);urls=tilesInView(lv-IDX.clusterShift).filter(k=>have.has(k)).map(k=>`data/c/${lv}/${k}.json`)}
+ if(urls.length>40){urls=urls.slice(0,40)} // garde-fou : jamais plus de 40 fichiers par vue
+ status.textContent="Chargement…";
+ let parts;try{parts=await Promise.all(urls.map(getJSON))}catch(e){if(g===gen){status.textContent="Erreur de chargement";showMsg("Une partie des données n'a pas pu être chargée. Rechargez la page.")}return}
+ if(g!==gen)return; // une vue plus récente a pris le relais
+ current={level:lv,p:parts.flatMap(d=>d.p),v:parts.flatMap(d=>d.v)};
+ draw();
+ const np=lv==="i"?current.p.length:current.p.reduce((s,c)=>s+c[2],0),nv=lv==="i"?current.v.length:current.v.reduce((s,c)=>s+c[2],0);
+ status.textContent=`${fmt(np)} producteurs · ${fmt(nv)} points de vente chargés`;
+ if(mode==="list")renderList();
+}
+function draw(){
+ if(!map.getSource("pc"))return;
+ const lv=current.level,ind=lv==="i",showP=layerMode!=="v",showV=layerMode!=="p";
+ map.getSource("pc").setData(fc(!ind&&showP?current.p.map(c=>({type:"Feature",properties:{n:c[2],t:fmt(c[2])},geometry:{type:"Point",coordinates:[c[0],c[1]]}})):[]));
+ map.getSource("vc").setData(fc(!ind&&showV?current.v.map(c=>({type:"Feature",properties:{n:c[2],t:fmt(c[2])},geometry:{type:"Point",coordinates:[c[0],c[1]]}})):[]));
+ map.getSource("pi").setData(fc(ind&&showP?current.p.map((p,i)=>({type:"Feature",properties:{i},geometry:{type:"Point",coordinates:[p[1],p[2]]}})):[]));
+ map.getSource("vi").setData(fc(ind&&showV?current.v.map((v,i)=>({type:"Feature",properties:{i},geometry:{type:"Point",coordinates:[v[1],v[2]]}})):[]));
+}
+
+// ---------- Carte ----------
+const map=new maplibregl.Map({container:"map",style:STYLE,center:[2.45,46.6],zoom:5.2,minZoom:4.5,maxZoom:17,attributionControl:{compact:true}});
+map.addControl(new maplibregl.NavigationControl({showCompass:false}),"right");
+map.on("error",e=>{const m=String(e&&e.error&&e.error.message||"");if(/geopf|style|Failed to fetch/i.test(m))showMsg("Le fond Plan IGN n'a pas pu être chargé : "+m)});
+function styleFont(){for(const l of map.getStyle().layers){const f=l.layout&&l.layout["text-font"];if(Array.isArray(f)&&typeof f[0]==="string")return f}return["Open Sans Regular"]}
+function diamond(color,size){const c=document.createElement("canvas");c.width=c.height=size;const x=c.getContext("2d");x.translate(size/2,size/2);x.rotate(Math.PI/4);const s=size*0.6;x.fillStyle=color;x.strokeStyle="#fff";x.lineWidth=size*0.08;x.fillRect(-s/2,-s/2,s,s);x.strokeRect(-s/2,-s/2,s,s);return x.getImageData(0,0,size,size)}
+map.on("style.load",()=>{
+ const font=styleFont();
+ map.addImage("losange",diamond("#b4621f",36),{pixelRatio:2});map.addImage("losange-g",diamond("#b4621f",64),{pixelRatio:2});
+ ["pc","vc","pi","vi","toile","toile-pts"].forEach(s=>map.addSource(s,{type:"geojson",data:fc([])}));
+ map.addLayer({id:"vc",type:"symbol",source:"vc",layout:{"icon-image":"losange-g","icon-size":["step",["get","n"],0.8,20,1,200,1.25,2000,1.5],"icon-allow-overlap":true,"text-field":["get","t"],"text-font":font,"text-size":11,"text-allow-overlap":true},paint:{"text-color":"#fff"}});
+ map.addLayer({id:"pc",type:"circle",source:"pc",paint:{"circle-color":"#2f6b3a","circle-radius":["step",["get","n"],11,20,14,200,18,2000,23,10000,28],"circle-stroke-width":2.5,"circle-stroke-color":"#fff"}});
+ map.addLayer({id:"pc-n",type:"symbol",source:"pc",layout:{"text-field":["get","t"],"text-font":font,"text-size":12,"text-allow-overlap":true},paint:{"text-color":"#fff"}});
+ map.addLayer({id:"vi",type:"symbol",source:"vi",layout:{"icon-image":"losange","icon-allow-overlap":true}});
+ map.addLayer({id:"pi",type:"circle",source:"pi",paint:{"circle-color":"#2f6b3a","circle-radius":6,"circle-stroke-width":1.8,"circle-stroke-color":"#fff"}});
+ map.addLayer({id:"toile-halo",type:"line",source:"toile",paint:{"line-color":"#fff","line-width":5,"line-opacity":0.9},layout:{"line-cap":"round"}});
+ map.addLayer({id:"toile",type:"line",source:"toile",filter:["!=",["get","inverse"],true],paint:{"line-color":"#b4621f","line-width":2.2},layout:{"line-cap":"round"}});
+ map.addLayer({id:"toile-inv",type:"line",source:"toile",filter:["==",["get","inverse"],true],paint:{"line-color":"#b4621f","line-width":2.2,"line-dasharray":[2,2]}});
+ map.addLayer({id:"toile-v",type:"symbol",source:"toile-pts",filter:["==",["get","kind"],"v"],layout:{"icon-image":"losange-g","icon-size":0.75,"icon-allow-overlap":true,"text-field":["get","n"],"text-font":font,"text-size":12,"text-anchor":"left","text-offset":[1.1,0],"text-optional":true},paint:{"text-color":"#1e271f","text-halo-color":"#fff","text-halo-width":1.6}});
+ map.addLayer({id:"toile-p",type:"circle",source:"toile-pts",filter:["==",["get","kind"],"p"],paint:{"circle-color":"#2f6b3a","circle-radius":["case",["get","centre"],9,7],"circle-stroke-width":3,"circle-stroke-color":"#fff"}});
+ map.addLayer({id:"toile-p-lbl",type:"symbol",source:"toile-pts",filter:["==",["get","kind"],"p"],layout:{"text-field":["get","n"],"text-font":font,"text-size":12,"text-anchor":"left","text-offset":[1.1,0],"text-optional":true},paint:{"text-color":"#1e271f","text-halo-color":"#fff","text-halo-width":1.6}});
+ setDim(false);draw();
+});
+// Données rechargées à la fin de chaque mouvement : les regroupements ne changent qu'au changement de palier
+map.on("moveend",refresh);
+getJSON("data/index.json").then(j=>{IDX=j;refresh()}).catch(()=>showMsg("Index des données introuvable."));
+
+function setDim(on){if(!map.getLayer("pc"))return;const o=on?0.25:1;
+ ["pc","pi"].forEach(l=>{map.setPaintProperty(l,"circle-opacity",o);map.setPaintProperty(l,"circle-stroke-opacity",o)});
+ ["vc","vi"].forEach(l=>map.setPaintProperty(l,"icon-opacity",o));["pc-n","vc"].forEach(l=>map.setPaintProperty(l,"text-opacity",o))}
+
+// ---------- Sélection et toile ----------
+// Producteur : {kind:"p", id, pos, nom, cat, prem, links:[[lon,lat,type,nom]]} ; point : {kind:"v", id, pos, nom, type, prods:[[lon,lat,nom,cat]]}
+const asProd=p=>({kind:"p",id:p[0],pos:[p[1],p[2]],nom:p[3],cat:p[4],prem:p[5],links:p[6]});
+const asVente=v=>({kind:"v",id:v[0],pos:[v[1],v[2]],nom:v[3],type:v[4],prods:v[5]});
+function arc(a,b){const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2,dx=b[0]-a[0],dy=b[1]-a[1],k=0.18,cx=mx-dy*k,cy=my+dx*k,pts=[];for(let i=0;i<=24;i++){const t=i/24,u=1-t;pts.push([u*u*a[0]+2*u*t*cx+t*t*b[0],u*u*a[1]+2*u*t*cy+t*t*b[1]])}return pts}
+const card=document.getElementById("card");
+function select(it,fly=true){
+ sel=it;setDim(!!it);
+ if(!it){card.hidden=true;map.getSource("toile").setData(fc([]));map.getSource("toile-pts").setData(fc([]));return}
+ const ends=it.kind==="p"?it.links.map(l=>({kind:"v",pos:[l[0],l[1]],nom:l[3]})):it.prods.map(p=>({kind:"p",pos:[p[0],p[1]],nom:p[2]}));
+ map.getSource("toile").setData(fc(ends.map(o=>({type:"Feature",properties:{inverse:it.kind==="v"},geometry:{type:"LineString",coordinates:arc(it.pos,o.pos)}}))));
+ map.getSource("toile-pts").setData(fc([...ends,{...it,centre:true}].map(o=>({type:"Feature",properties:{kind:o.kind,n:o.centre||ends.length<=12?o.nom:"",centre:!!o.centre},geometry:{type:"Point",coordinates:o.pos}}))));
+ card.innerHTML=it.kind==="p"?prodCard(it):venteCard(it);card.hidden=mode==="list";
+ card.querySelector(".close").onclick=()=>select(null);
+ card.querySelectorAll("[data-at]").forEach(b=>b.onclick=()=>{const[lo,la]=b.dataset.at.split(",").map(Number);openAt([lo,la],it.kind==="p"?"v":"p")});
+ if(fly&&ends.length){const b=new maplibregl.LngLatBounds(it.pos,it.pos);ends.forEach(o=>b.extend(o.pos));const wide=window.innerWidth>640;
+  map.fitBounds(b,{padding:{top:150,bottom:wide?90:Math.min(window.innerHeight*.5,340),left:wide?420:40,right:60},maxZoom:14,minZoom:13,duration:matchMedia("(prefers-reduced-motion: reduce)").matches?0:700})}
+}
+// Ouvre l'élément situé à une position (cliqué depuis une fiche) une fois sa zone chargée
+let pending=null;
+function openAt(pos,kind){pending={pos,kind};map.easeTo({center:pos,zoom:Math.max(13.5,map.getZoom())})}
+map.on("idle",()=>{if(!pending||current.level!=="i")return;const{pos,kind}=pending;pending=null;
+ const arr=kind==="p"?current.p:current.v;const f=arr.find(r=>Math.abs(r[1]-pos[0])<1e-5&&Math.abs(r[2]-pos[1])<1e-5);if(f)select(kind==="p"?asProd(f):asVente(f),true)});
+function prodCard(p){const links=[...p.links].sort((a,b)=>KM(p.pos,a)-KM(p.pos,b));
+ return `<button class="close" aria-label="Fermer">×</button><span class="eyebrow p">Producteur${p.prem?" · premium":""}</span><h2>${esc(p.nom)}</h2>
+ <div><span class="tag">${CATS[p.cat]}</span></div>
+ <div><b>${links.length} point${links.length>1?"s":""} de vente</b>${!p.prem?` <span class="meta">(formule gratuite, 2 max)</span>`:""}</div>
+ ${links.length?`<ul class="links">${links.map(l=>`<li><button data-at="${l[0]},${l[1]}"><span>${esc(l[3])} <span class="meta">· ${TYPES[l[2]]}</span></span><span class="km">${KM(p.pos,l).toFixed(1)} km</span></button></li>`).join("")}</ul>`:`<div class="meta">Aucun point de vente référencé.</div>`}`}
+function venteCard(v){const ps=[...v.prods].sort((a,b)=>KM(v.pos,a)-KM(v.pos,b));
+ return `<button class="close" aria-label="Fermer">×</button><span class="eyebrow v">${TYPES[v.type]}</span><h2>${esc(v.nom)}</h2>
+ <div class="meta">Lieu partagé par ${ps.length} producteur${ps.length>1?"s":""}</div>
+ ${ps.length?`<ul class="links">${ps.map(p=>`<li><button data-at="${p[0]},${p[1]}"><span>${esc(p[2])} <span class="meta">· ${CATS[p[3]]}</span></span><span class="km">${KM(v.pos,p).toFixed(1)} km</span></button></li>`).join("")}</ul>`:`<div class="meta">Aucun producteur référencé ici.</div>`}`}
+
+map.on("click","pi",e=>select(asProd(current.p[e.features[0].properties.i])));
+map.on("click","vi",e=>select(asVente(current.v[e.features[0].properties.i])));
+const zoomIn=e=>map.easeTo({center:e.features[0].geometry.coordinates,zoom:Math.min(13.2,Math.floor(map.getZoom())+2)});
+map.on("click","pc",zoomIn);map.on("click","vc",zoomIn);
+map.on("click",e=>{if(!sel)return;const hit=map.queryRenderedFeatures(e.point,{layers:["pc","vc","pi","vi","toile-p","toile-v"].filter(l=>map.getLayer(l))});if(!hit.length)select(null)});
+["pc","vc","pi","vi"].forEach(l=>{map.on("mouseenter",l,()=>map.getCanvas().style.cursor="pointer");map.on("mouseleave",l,()=>map.getCanvas().style.cursor="")});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&sel)select(null)});
+
+// ---------- Filtres de couche ----------
+document.querySelectorAll("[data-layer]").forEach(b=>b.onclick=()=>{layerMode=b.dataset.layer;document.querySelectorAll("[data-layer]").forEach(x=>x.setAttribute("aria-pressed",x===b));draw();if(mode==="list")renderList()});
+
+// ---------- Recherche de commune (géocodage Géoplateforme IGN) ----------
+document.getElementById("search").addEventListener("submit",async e=>{e.preventDefault();const q=document.getElementById("q").value.trim();if(!q)return;
+ try{const r=await fetch("https://data.geopf.fr/geocodage/search?index=address&type=municipality&limit=1&q="+encodeURIComponent(q));const j=await r.json();const f=j.features&&j.features[0];
+  if(!f){showMsg("Commune introuvable : "+q);return}showMsg("");if(mode==="list")setMode("map");select(null);map.flyTo({center:f.geometry.coordinates,zoom:12})}
+ catch(err){showMsg("La recherche de commune n'a pas répondu. Réessayez.")}});
+
+// ---------- Mode liste (zone visible) ----------
+const list=document.getElementById("list"),listInner=document.getElementById("listInner"),toggle=document.getElementById("toggle");
+function renderList(){const b=map.getBounds(),c=map.getCenter().toArray(),inB=(lo,la)=>b.contains([lo,la]);
+ if(current.level!=="i"){
+  const np=layerMode!=="v"?current.p.filter(g=>inB(g[0],g[1])).reduce((s,g)=>s+g[2],0):0,nv=layerMode!=="p"?current.v.filter(g=>inB(g[0],g[1])).reduce((s,g)=>s+g[2],0):0;
+  listInner.innerHTML=`<h2>Environ ${np.toLocaleString("fr-FR")} producteurs et ${nv.toLocaleString("fr-FR")} points de vente dans cette zone</h2>
+  <div class="meta">La zone est trop large pour une liste lisible. Rapprochez-vous pour voir chaque fiche.</div><button class="zoomhere" id="zh">Me rapprocher ici</button>`;
+  document.getElementById("zh").onclick=()=>{setMode("map");map.easeTo({zoom:13.2})};return}
+ const items=[...(layerMode!=="v"?current.p.filter(p=>inB(p[1],p[2])).map(asProd):[]),...(layerMode!=="p"?current.v.filter(v=>inB(v[1],v[2])).map(asVente):[])].sort((a,z)=>KM(c,a.pos)-KM(c,z.pos));
+ const np=items.filter(i=>i.kind==="p").length,nv=items.length-np;
+ listInner.innerHTML=`<h2>${np} producteur${np>1?"s":""} et ${nv} point${nv>1?"s":""} de vente dans cette zone</h2>
+ <div class="meta">La liste suit la zone affichée sur la carte, du centre vers les bords.</div>
+ <div class="rows">${items.slice(0,listLimit).map((i,k)=>i.kind==="p"?`<button class="row" data-k="${k}"><span class="eyebrow p">Producteur · ${CATS[i.cat]}</span><b>${esc(i.nom)}</b><span class="meta">${i.links.length} point${i.links.length>1?"s":""} de vente · ${KM(c,i.pos).toFixed(1)} km du centre</span></button>`:`<button class="row" data-k="${k}"><span class="eyebrow v">${TYPES[i.type]}</span><b>${esc(i.nom)}</b><span class="meta">${i.prods.length} producteur${i.prods.length>1?"s":""} · ${KM(c,i.pos).toFixed(1)} km du centre</span></button>`).join("")}</div>
+ ${items.length>listLimit?`<button class="more" id="more">Afficher ${Math.min(48,items.length-listLimit)} de plus</button>`:""}
+ ${!items.length?`<p class="meta">Rien dans cette zone.</p>`:""}`;
+ listInner.querySelectorAll("[data-k]").forEach(x=>x.onclick=()=>{setMode("map");select(items[+x.dataset.k])});
+ const m=document.getElementById("more");if(m)m.onclick=()=>{listLimit+=48;renderList()}}
+function setMode(m){mode=m;list.hidden=m!=="list";toggle.textContent=m==="list"?"Afficher la carte":"Afficher la liste";if(m==="list"){listLimit=48;card.hidden=true;renderList();list.scrollTop=0}else if(sel)card.hidden=false}
+toggle.onclick=()=>setMode(mode==="map"?"list":"map");
+</script>
+</body>
+</html>
