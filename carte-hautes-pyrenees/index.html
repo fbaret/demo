@@ -88,9 +88,9 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(-
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js" crossorigin="anonymous"></script>
 <script>
 const STYLE="https://data.geopf.fr/annexes/ressources/vectorTiles/styles/PLAN.IGN/gris.json";
-// Zoom à partir duquel on ne regroupe plus ; essai sans code : ?detail=N (9 à 16)
-const ZOOM_DETAIL_DEFAUT=13;
-const ZOOM_DETAIL=(()=>{const v=parseInt(new URLSearchParams(location.search).get("detail"),10);return Number.isFinite(v)?Math.max(9,Math.min(16,v)):ZOOM_DETAIL_DEFAUT})();
+// Zoom à partir duquel on ne regroupe plus ; essai sans code : ?detail=N (6 à 16)
+const ZOOM_DETAIL_DEFAUT=8; // décision du porteur, 27/10/2026
+const ZOOM_DETAIL=(()=>{const v=parseInt(new URLSearchParams(location.search).get("detail"),10);return Number.isFinite(v)?Math.max(6,Math.min(16,v)):ZOOM_DETAIL_DEFAUT})();
 const TYPES={"marché":"Marché","AMAP":"AMAP","magasin":"Magasin","distributeur":"Distributeur","lieu de vente":"Lieu de vente déclaré"};
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const KM=(a,b)=>{const r=Math.PI/180,dl=(b[1]-a[1])*r,dg=(b[0]-a[0])*r;const h=Math.sin(dl/2)**2+Math.cos(a[1]*r)*Math.cos(b[1]*r)*Math.sin(dg/2)**2;return 12742*Math.asin(Math.sqrt(h))};
