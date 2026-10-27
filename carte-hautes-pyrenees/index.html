@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Prodélien Hautes-Pyrénées</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Données réelles (Agence Bio + OpenStreetMap), Hautes-Pyrénées, fond Plan IGN gris.
+   Mêmes parcours que la démo France : carte, liste de la zone, toile, regroupements par zones jusqu'au zoom de détail. */
+:root{--bg:#eef0e8;--surface:#fff;--fg:#1e271f;--muted:#5f6b5e;--line:#d3d8c9;--prod:#2f6b3a;--vente:#b4621f;--bio:#5b8c2a;--shadow:0 6px 24px rgba(30,40,30,.16);
+ --display:"Fraunces",Georgia,serif;--body:"Public Sans",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px;overflow:hidden}
+#map{position:absolute;inset:0}
+.float{position:absolute;z-index:5}
+.top{top:calc(12px + env(safe-area-inset-top,0px));left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.top>*{pointer-events:auto}
+.bar{display:flex;gap:8px;align-items:center;background:var(--surface);border-radius:999px;box-shadow:var(--shadow);padding:6px 6px 6px 16px;max-width:560px}
+.brand{font-family:var(--display);font-size:18px;white-space:nowrap}
+.bar input{flex:1;min-width:0;border:0;background:transparent;color:var(--fg);font:inherit;font-size:16px;padding:8px 4px;outline:none}
+.go{border:0;background:var(--prod);color:#fff;border-radius:999px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;align-items:center}
+.chip{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:6px 11px;font:inherit;font-size:13px;cursor:pointer}
+.chip[aria-pressed="true"],.chip[aria-expanded="true"]{background:var(--fg);color:var(--surface);border-color:var(--fg)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+.sep{flex:none;width:1px;align-self:stretch;background:var(--line);margin:4px 2px}
+.status{flex:none;font-size:12px;color:var(--muted);background:var(--surface);border-radius:999px;padding:5px 10px;box-shadow:0 1px 3px rgba(0,0,0,.08);font-variant-numeric:tabular-nums}
+.toggle{left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));border:0;background:var(--fg);color:var(--surface);border-radius:999px;padding:12px 20px;font:inherit;font-weight:600;box-shadow:var(--shadow);cursor:pointer;white-space:nowrap}
+.card{left:max(12px,env(safe-area-inset-left,0px));bottom:calc(80px + env(safe-area-inset-bottom,0px));width:min(380px,calc(100% - 24px));max-height:52%;overflow:auto;background:var(--surface);border-radius:14px;box-shadow:var(--shadow);padding:16px;display:grid;gap:10px;box-sizing:border-box}
+.card h2{font-family:var(--display);font-size:20px;margin:0;line-height:1.2;padding-right:24px;text-wrap:balance}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+.eyebrow.p{color:var(--prod)}.eyebrow.v{color:var(--vente)}
+.meta{color:var(--muted);font-size:13px}
+.close{position:absolute;top:10px;right:10px;border:0;background:transparent;color:var(--muted);font-size:22px;cursor:pointer}
+.links{display:grid;gap:2px;margin:0;padding:0;list-style:none}
+.links button{width:100%;text-align:left;border:0;background:transparent;color:var(--fg);font:inherit;padding:7px 8px;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.links button:hover{background:var(--bg)}
+.km{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap}
+.tag{display:inline-block;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;margin:0 4px 4px 0}
+.tag.bio{border-color:var(--bio);color:var(--bio);font-weight:600}
+.src{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:8px}
+.card a{color:var(--prod)}
+.list{position:absolute;inset:0;z-index:4;background:var(--bg);overflow:auto;padding:150px 16px 90px}
+.list .inner{max-width:900px;margin:0 auto;display:grid;gap:12px}
+.list h2{font-family:var(--display);font-size:22px;margin:0}
+.rows{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.row{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:left;font:inherit;color:var(--fg);cursor:pointer;display:grid;gap:4px}
+.more{justify-self:start;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:9px 16px;font:inherit;cursor:pointer}
+.panel{right:max(12px,env(safe-area-inset-right,0px));top:calc(150px + env(safe-area-inset-top,0px));width:min(290px,calc(100% - 24px));max-height:calc(100% - 260px);overflow:auto;box-sizing:border-box;background:var(--surface);border-radius:12px;box-shadow:var(--shadow);padding:12px;display:grid;gap:8px;font-size:13px;line-height:1.35}
+.panel h3{margin:0;font-family:var(--display);font-size:16px}
+.lg-row{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:center}
+.lg-row .meta{font-size:12px}
+.lg-zoom{border-top:1px solid var(--line);padding-top:8px;font-family:var(--mono);font-size:11.5px;color:var(--muted);line-height:1.5}
+.lg-zoom b{color:var(--fg);font-weight:500}
+.stats{display:grid;grid-template-columns:1fr auto;gap:2px 12px;font-variant-numeric:tabular-nums}
+.stats span:nth-child(even){text-align:right;font-family:var(--mono);font-size:12px}
+.diag{align-self:flex-start;max-width:min(560px,100%);font-family:var(--mono);font-size:11px;color:#a8322b;background:var(--surface);border:1px solid #a8322b;border-radius:8px;padding:4px 8px}
+.maplibregl-ctrl-bottom-right{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--prod);outline-offset:2px}
+@media (max-width:640px){.brand{display:none}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="float top">
+ <form class="bar" id="search" role="search">
+  <span class="brand">Prodélien</span>
+  <input id="q" placeholder="Une commune, ex. Lourdes, Arreau" autocomplete="off" aria-label="Rechercher une commune">
+  <button class="go" type="submit">Rechercher</button>
+ </form>
+ <div class="chips" id="chips"></div>
+ <div class="diag" id="diag" hidden></div>
+</div>
+<aside class="float panel" id="legend" hidden aria-label="Légende"></aside>
+<aside class="float panel" id="about" hidden aria-label="À propos des données"></aside>
+<section class="float card" id="card" hidden></section>
+<section class="list" id="list" hidden><div class="inner" id="listInner"></div></section>
+<button class="float toggle" id="toggle">Afficher la liste</button>
+<script>
+// Témoin d'erreur posé avant tout autre script
+(function(){var el=document.getElementById("diag");function show(t){el.hidden=false;el.textContent=(el.textContent?el.textContent+" · ":"")+"⚠ "+t}
+ window.addEventListener("error",function(e){show((e.message||"erreur")+(e.lineno?" (ligne "+e.lineno+")":""))});
+ window.addEventListener("unhandledrejection",function(e){show(String(e.reason&&e.reason.message||e.reason))});})();
+</script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js" crossorigin="anonymous"></script>
+<script>
+const STYLE="https://data.geopf.fr/annexes/ressources/vectorTiles/styles/PLAN.IGN/gris.json";
+// Zoom à partir duquel on ne regroupe plus ; essai sans code : ?detail=N (9 à 16)
+const ZOOM_DETAIL_DEFAUT=13;
+const ZOOM_DETAIL=(()=>{const v=parseInt(new URLSearchParams(location.search).get("detail"),10);return Number.isFinite(v)?Math.max(9,Math.min(16,v)):ZOOM_DETAIL_DEFAUT})();
+const TYPES={"marché":"Marché","AMAP":"AMAP","magasin":"Magasin","distributeur":"Distributeur","lieu de vente":"Lieu de vente déclaré"};
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const KM=(a,b)=>{const r=Math.PI/180,dl=(b[1]-a[1])*r,dg=(b[0]-a[0])*r;const h=Math.sin(dl/2)**2+Math.cos(a[1]*r)*Math.cos(b[1]*r)*Math.sin(dg/2)**2;return 12742*Math.asin(Math.sqrt(h))};
+const fc=f=>({type:"FeatureCollection",features:f});
+const diagEl=document.getElementById("diag");function diag(t){diagEl.hidden=false;diagEl.textContent="⚠ "+t}
+
+let D=null,sel=null,mode="map",listLimit=48;
+const state={layer:"all",cat:null,type:null};
+const visibleP=p=>state.layer!=="v"&&(!state.cat||p.cats.includes(state.cat));
+const visibleV=v=>state.layer!=="p"&&!state.cat&&(!state.type||v.type===state.type);
+const prodGeo=()=>fc(D.producteurs.map((p,i)=>[p,i]).filter(([p])=>visibleP(p)).map(([p,i])=>({type:"Feature",properties:{i},geometry:{type:"Point",coordinates:p.pos}})));
+const venteGeo=()=>fc(D.points.map((v,i)=>[v,i]).filter(([v])=>visibleV(v)).map(([v,i])=>({type:"Feature",properties:{i},geometry:{type:"Point",coordinates:v.pos}})));
+
+let map;
+try{map=new maplibregl.Map({container:"map",style:STYLE,center:[0.15,43.05],zoom:8.6,minZoom:7,maxZoom:17,attributionControl:{compact:true,customAttribution:"Données : Agence Bio (Licence Ouverte 2.0) · © contributeurs OpenStreetMap (ODbL)"}})}catch(e){diag("création carte : "+e.message);throw e}
+map.addControl(new maplibregl.NavigationControl({showCompass:false}),"bottom-right");
+map.on("error",e=>{const m=String(e&&e.error&&e.error.message||"");if(m)diag("carte : "+m)});
+function styleFont(){for(const l of map.getStyle().layers){const f=l.layout&&l.layout["text-font"];if(Array.isArray(f)&&typeof f[0]==="string")return f}return["Open Sans Regular"]}
+function diamond(color,size){const c=document.createElement("canvas");c.width=c.height=size;const x=c.getContext("2d");x.translate(size/2,size/2);x.rotate(Math.PI/4);const s=size*0.6;x.fillStyle=color;x.strokeStyle="#fff";x.lineWidth=size*0.08;x.fillRect(-s/2,-s/2,s,s);x.strokeRect(-s/2,-s/2,s,s);return x.getImageData(0,0,size,size)}
+
+let ready=false;
+function init(){
+ if(ready||!D||!map.isStyleLoaded())return;ready=true;
+ try{
+ const font=styleFont();
+ map.addImage("losange",diamond("#b4621f",36),{pixelRatio:2});map.addImage("losange-g",diamond("#b4621f",64),{pixelRatio:2});
+ // Regroupement natif MapLibre (par distance, recalculé par zoom entier, jamais au déplacement) jusqu'au zoom de détail
+ const opt={type:"geojson",cluster:true,clusterMaxZoom:ZOOM_DETAIL-1,clusterRadius:50};
+ map.addSource("prods",{...opt,data:prodGeo()});map.addSource("ventes",{...opt,data:venteGeo()});
+ map.addSource("toile",{type:"geojson",data:fc([])});map.addSource("toile-pts",{type:"geojson",data:fc([])});
+ map.addLayer({id:"v-cluster",type:"symbol",source:"ventes",filter:["has","point_count"],layout:{"icon-image":"losange-g","icon-size":["step",["get","point_count"],0.85,10,1.05,50,1.3],"icon-allow-overlap":true,"text-field":["get","point_count_abbreviated"],"text-font":font,"text-size":11,"text-allow-overlap":true},paint:{"text-color":"#fff"}});
+ map.addLayer({id:"v-point",type:"symbol",source:"ventes",filter:["!",["has","point_count"]],layout:{"icon-image":"losange","icon-allow-overlap":true}});
+ map.addLayer({id:"p-cluster",type:"circle",source:"prods",filter:["has","point_count"],paint:{"circle-color":"#2f6b3a","circle-radius":["step",["get","point_count"],12,10,15,50,19,200,24],"circle-stroke-width":2.5,"circle-stroke-color":"#fff"}});
+ map.addLayer({id:"p-count",type:"symbol",source:"prods",filter:["has","point_count"],layout:{"text-field":["get","point_count_abbreviated"],"text-font":font,"text-size":12,"text-allow-overlap":true},paint:{"text-color":"#fff"}});
+ map.addLayer({id:"p-point",type:"circle",source:"prods",filter:["!",["has","point_count"]],paint:{"circle-color":"#2f6b3a","circle-radius":6,"circle-stroke-width":1.8,"circle-stroke-color":"#fff"}});
+ map.addLayer({id:"toile-halo",type:"line",source:"toile",paint:{"line-color":"#fff","line-width":5,"line-opacity":0.9},layout:{"line-cap":"round"}});
+ map.addLayer({id:"toile",type:"line",source:"toile",filter:["!=",["get","inverse"],true],paint:{"line-color":"#b4621f","line-width":2.2},layout:{"line-cap":"round"}});
+ map.addLayer({id:"toile-inv",type:"line",source:"toile",filter:["==",["get","inverse"],true],paint:{"line-color":"#b4621f","line-width":2.2,"line-dasharray":[2,2]}});
+ map.addLayer({id:"toile-v",type:"symbol",source:"toile-pts",filter:["==",["get","kind"],"v"],layout:{"icon-image":"losange-g","icon-size":0.75,"icon-allow-overlap":true,"text-field":["get","n"],"text-font":font,"text-size":12,"text-anchor":"left","text-offset":[1.1,0],"text-optional":true},paint:{"text-color":"#1e271f","text-halo-color":"#fff","text-halo-width":1.6}});
+ map.addLayer({id:"toile-p",type:"circle",source:"toile-pts",filter:["==",["get","kind"],"p"],paint:{"circle-color":"#2f6b3a","circle-radius":["case",["get","centre"],9,7],"circle-stroke-width":3,"circle-stroke-color":"#fff"}});
+ map.addLayer({id:"toile-p-lbl",type:"symbol",source:"toile-pts",filter:["==",["get","kind"],"p"],layout:{"text-field":["get","n"],"text-font":font,"text-size":12,"text-anchor":"left","text-offset":[1.1,0],"text-optional":true},paint:{"text-color":"#1e271f","text-halo-color":"#fff","text-halo-width":1.6}});
+ bindLayers();updateLegend();
+ }catch(e){ready=false;diag("couches : "+e.message)}
+}
+["style.load","load","styledata","idle"].forEach(ev=>map.on(ev,init));
+fetch("donnees.json").then(r=>{if(!r.ok)throw new Error("données "+r.status);return r.json()}).then(j=>{D=j;renderChips();renderAbout();init()}).catch(e=>diag(e.message));
+
+function setDim(on){const o=on?0.25:1;["p-cluster","p-point"].forEach(l=>{map.setPaintProperty(l,"circle-opacity",o);map.setPaintProperty(l,"circle-stroke-opacity",o)});
+ ["v-cluster","v-point"].forEach(l=>map.setPaintProperty(l,"icon-opacity",o));map.setPaintProperty("p-count","text-opacity",o);map.setPaintProperty("v-cluster","text-opacity",o)}
+
+// ---------- Toile et fiches ----------
+function arc(a,b){const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2,dx=b[0]-a[0],dy=b[1]-a[1],k=0.18,cx=mx-dy*k,cy=my+dx*k,pts=[];for(let i=0;i<=24;i++){const t=i/24,u=1-t;pts.push([u*u*a[0]+2*u*t*cx+t*t*b[0],u*u*a[1]+2*u*t*cy+t*t*b[1]])}return pts}
+const card=document.getElementById("card");
+function select(kind,i,fly=true){
+ if(kind==null){sel=null;card.hidden=true;setDim(false);map.getSource("toile").setData(fc([]));map.getSource("toile-pts").setData(fc([]));return}
+ sel={kind,i};const it=kind==="p"?D.producteurs[i]:D.points[i];
+ const ends=kind==="p"?it.liens.map(j=>({kind:"v",j,o:D.points[j]})):it.prods.map(j=>({kind:"p",j,o:D.producteurs[j]}));
+ setDim(true);
+ map.getSource("toile").setData(fc(ends.map(e=>({type:"Feature",properties:{inverse:kind==="v"},geometry:{type:"LineString",coordinates:arc(it.pos,e.o.pos)}}))));
+ map.getSource("toile-pts").setData(fc([...ends.map(e=>({kind:e.kind,o:e.o})),{kind,o:it,centre:true}].map(e=>({type:"Feature",properties:{kind:e.kind,n:e.o.nom,centre:!!e.centre},geometry:{type:"Point",coordinates:e.o.pos}}))));
+ card.innerHTML=kind==="p"?prodCard(it,ends):venteCard(it,ends);card.hidden=mode==="list";
+ card.querySelector(".close").onclick=()=>select(null);
+ card.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{const[k,j]=b.dataset.go.split(":");select(k,+j)});
+ if(fly){if(ends.length){const b=new maplibregl.LngLatBounds(it.pos,it.pos);ends.forEach(e=>b.extend(e.o.pos));const wide=window.innerWidth>640;
+   map.fitBounds(b,{padding:{top:160,bottom:wide?90:Math.min(window.innerHeight*.5,340),left:wide?420:40,right:60},maxZoom:14})}
+  else map.easeTo({center:it.pos,zoom:Math.max(map.getZoom(),ZOOM_DETAIL)})}
+}
+const lien=u=>u?`<a href="${esc(/^https?:/.test(u)?u:"https://"+u)}" target="_blank" rel="noopener">${esc(u.replace(/^https?:\/\/(www\.)?/,"").replace(/\/$/,""))}</a>`:"";
+function prodCard(p,ends){
+ return `<button class="close" aria-label="Fermer">×</button><span class="eyebrow p">Producteur</span><h2>${esc(p.nom)}</h2>
+ <div class="meta">${esc(p.commune)}</div>
+ <div>${p.bio?'<span class="tag bio">Bio certifié</span>':""}${p.cats.map(c=>`<span class="tag">${esc(c)}</span>`).join("")}</div>
+ ${p.surPlace?`<div><b>Vente sur place</b>${p.horaires?` <span class="meta">· ${esc(p.horaires)}</span>`:""}</div>`:p.ventePart?`<div class="meta">Déclare vendre aux particuliers, lieu non précisé</div>`:""}
+ ${ends.length?`<div><b>${ends.length} autre${ends.length>1?"s":""} point${ends.length>1?"s":""} de vente</b></div><ul class="links">${ends.map(e=>`<li><button data-go="v:${e.j}"><span>${esc(e.o.nom)} <span class="meta">· ${TYPES[e.o.type]||e.o.type}</span></span><span class="km">${KM(p.pos,e.o.pos).toFixed(1)} km</span></button></li>`).join("")}</ul>`:`<div class="meta">Aucun autre point de vente connu. Les sources ouvertes ne disent pas sur quels marchés ou dans quels magasins il vend.</div>`}
+ ${p.site?`<div>${lien(p.site)}</div>`:""}
+ <div class="src">Source : ${esc(p.source)}${p.numeroBio?` · n° bio ${esc(p.numeroBio)}`:""}</div>`}
+function venteCard(v,ends){
+ return `<button class="close" aria-label="Fermer">×</button><span class="eyebrow v">${esc(TYPES[v.type]||v.type)}${v.bio?" · bio":""}</span><h2>${esc(v.nom)}</h2>
+ <div class="meta">${esc(v.commune)}${v.horaires?` · ${esc(v.horaires)}`:""}</div>
+ ${ends.length?`<div><b>${ends.length} producteur${ends.length>1?"s":""} connu${ends.length>1?"s":""} ici</b></div><ul class="links">${ends.map(e=>`<li><button data-go="p:${e.j}"><span>${esc(e.o.nom)} <span class="meta">· ${esc(e.o.cats[0]||"")}</span></span><span class="km">${KM(v.pos,e.o.pos).toFixed(1)} km</span></button></li>`).join("")}</ul>`:`<div class="meta">Aucun producteur rattaché dans les sources ouvertes.</div>`}
+ ${v.site?`<div>${lien(v.site)}</div>`:""}
+ <div class="src">Source : ${esc(v.source)}</div>`}
+
+function bindLayers(){
+ const zoomTo=(src,f)=>{const r=map.getSource(src).getClusterExpansionZoom(f.properties.cluster_id),go=z=>map.easeTo({center:f.geometry.coordinates,zoom:Math.min(z+0.2,ZOOM_DETAIL+0.3)});r&&r.then?r.then(go):go(r)};
+ map.on("click","p-cluster",e=>zoomTo("prods",e.features[0]));map.on("click","v-cluster",e=>zoomTo("ventes",e.features[0]));
+ map.on("click","p-point",e=>select("p",e.features[0].properties.i));map.on("click","v-point",e=>select("v",e.features[0].properties.i));
+ map.on("click",e=>{if(!sel)return;const hit=map.queryRenderedFeatures(e.point,{layers:["p-cluster","v-cluster","p-point","v-point","toile-p","toile-v"]});if(!hit.length)select(null)});
+ ["p-cluster","v-cluster","p-point","v-point"].forEach(l=>{map.on("mouseenter",l,()=>map.getCanvas().style.cursor="pointer");map.on("mouseleave",l,()=>map.getCanvas().style.cursor="")});
+}
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&sel)select(null)});
+
+// ---------- Filtres, légende, à propos ----------
+const chips=document.getElementById("chips"),legend=document.getElementById("legend"),about=document.getElementById("about");
+function renderChips(){
+ const counts={};D.producteurs.forEach(p=>p.cats.forEach(c=>counts[c]=(counts[c]||0)+1));
+ const cats=D.cats.filter(c=>counts[c]);
+ chips.innerHTML=[["all","Tout"],["p",'<i class="dot" style="background:var(--prod)"></i>Producteurs'],["v",'<i class="dot" style="background:var(--vente);border-radius:2px"></i>Points de vente']].map(([k,l])=>`<button class="chip" data-layer="${k}" aria-pressed="${state.layer===k}">${l}</button>`).join("")
+  +`<button class="chip" id="legendBtn" aria-expanded="${!legend.hidden}">Légende</button><button class="chip" id="aboutBtn" aria-expanded="${!about.hidden}">Les données</button><span class="sep"></span>`
+  +cats.map(c=>`<button class="chip" data-cat="${esc(c)}" aria-pressed="${state.cat===c}">${esc(c)} <span class="meta">${counts[c]}</span></button>`).join("")
+  +`<span class="sep"></span>`+Object.entries(TYPES).map(([k,l])=>`<button class="chip" data-type="${esc(k)}" aria-pressed="${state.type===k}">${l}</button>`).join("");
+ chips.querySelectorAll("[data-layer]").forEach(b=>b.onclick=()=>{state.layer=b.dataset.layer;update()});
+ chips.querySelectorAll("[data-cat]").forEach(b=>b.onclick=()=>{state.cat=state.cat===b.dataset.cat?null:b.dataset.cat;if(state.cat)state.layer="all";update()});
+ chips.querySelectorAll("[data-type]").forEach(b=>b.onclick=()=>{state.type=state.type===b.dataset.type?null:b.dataset.type;if(state.type){state.cat=null;if(state.layer==="p")state.layer="all"}update()});
+ document.getElementById("legendBtn").onclick=()=>{legend.hidden=!legend.hidden;about.hidden=true;renderChips()};
+ document.getElementById("aboutBtn").onclick=()=>{about.hidden=!about.hidden;legend.hidden=true;renderChips()};
+}
+function update(){renderChips();if(map.getSource("prods")){map.getSource("prods").setData(prodGeo());map.getSource("ventes").setData(venteGeo())}if(mode==="list")renderList()}
+function updateLegend(){const z=map.getZoom();
+ legend.innerHTML=`<h3>Légende</h3>
+ <div class="lg-row"><svg width="22" height="22" aria-hidden="true"><circle cx="11" cy="11" r="6" fill="#2f6b3a" stroke="#fff" stroke-width="2"/></svg><span><b>Producteur</b><br><span class="meta">placé sur son lieu d'activité</span></span></div>
+ <div class="lg-row"><svg width="22" height="22" aria-hidden="true"><rect x="6" y="6" width="10" height="10" transform="rotate(45 11 11)" fill="#b4621f" stroke="#fff" stroke-width="1.5"/></svg><span><b>Point de vente</b><br><span class="meta">marché, AMAP, magasin, distributeur</span></span></div>
+ <div class="lg-row"><svg width="22" height="22" aria-hidden="true"><circle cx="11" cy="11" r="10" fill="#2f6b3a" stroke="#fff" stroke-width="2"/><text x="11" y="15" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">12</text></svg><span><b>Groupe</b><br><span class="meta">toucher pour se rapprocher</span></span></div>
+ <div class="lg-row"><svg width="22" height="22" aria-hidden="true"><path d="M2 18 Q 8 2 20 6" fill="none" stroke="#b4621f" stroke-width="2.2"/></svg><span><b>Toile</b><br><span class="meta">points de vente d'un producteur (pointillé : producteurs d'un lieu)</span></span></div>
+ <div class="lg-zoom">Zoom actuel <b>${z.toFixed(1).replace(".",",")}</b><br>${z>=ZOOM_DETAIL?"Fiches individuelles":"Regroupé"} · détail à partir du zoom <b>${ZOOM_DETAIL}</b></div>`}
+map.on("zoom",()=>{if(!legend.hidden)updateLegend()});
+function renderAbout(){const P=D.producteurs,V=D.points,n=f=>P.filter(f).length;
+ about.innerHTML=`<h3>Les données</h3>
+ <div class="meta">Données réelles et ouvertes, Hautes-Pyrénées, extraites le ${esc(D.date||"27/10/2026")}. Non vérifiées par Prodélien.</div>
+ <div class="stats"><span>Producteurs</span><span>${P.length}</span><span>dont bio certifiés (Agence Bio)</span><span>${n(p=>p.bio)}</span><span>dont vente sur place</span><span>${n(p=>p.surPlace)}</span><span>Points de vente</span><span>${V.length}</span><span>dont marchés</span><span>${V.filter(v=>v.type==="marché").length}</span><span>Producteurs reliés à un autre lieu de vente</span><span>${n(p=>p.liens.length)}</span></div>
+ <div class="meta">Ce que les sources ne disent pas : <b>sur quels marchés et dans quels magasins vend chaque producteur</b>. Les toiles sont donc presque vides ; c'est l'information que les contributions et les producteurs devront apporter.</div>
+ <div class="meta">Sources : Agence Bio, API Professionnels BIO (Licence Ouverte 2.0) ; OpenStreetMap via Overpass (ODbL, © contributeurs OpenStreetMap).</div>`}
+
+// ---------- Recherche, liste ----------
+document.getElementById("search").addEventListener("submit",async e=>{e.preventDefault();const q=document.getElementById("q").value.trim();if(!q)return;
+ try{const r=await fetch("https://data.geopf.fr/geocodage/search?index=address&type=municipality&limit=1&q="+encodeURIComponent(q+" 65"));const f=(await r.json()).features?.[0];
+  if(!f){diag("commune introuvable : "+q);return}if(mode==="list")setMode("map");select(null);map.flyTo({center:f.geometry.coordinates,zoom:12})}catch(err){diag("la recherche n'a pas répondu")}});
+const list=document.getElementById("list"),listInner=document.getElementById("listInner"),toggle=document.getElementById("toggle");
+function renderList(){const b=map.getBounds(),c=map.getCenter().toArray();
+ const items=[...D.producteurs.map((o,i)=>({kind:"p",i,o})).filter(x=>visibleP(x.o)&&b.contains(x.o.pos)),...D.points.map((o,i)=>({kind:"v",i,o})).filter(x=>visibleV(x.o)&&b.contains(x.o.pos))].sort((a,z)=>KM(c,a.o.pos)-KM(c,z.o.pos));
+ const np=items.filter(x=>x.kind==="p").length,nv=items.length-np;
+ listInner.innerHTML=`<h2>${np} producteur${np>1?"s":""} et ${nv} point${nv>1?"s":""} de vente dans cette zone</h2><div class="meta">La liste suit la zone affichée sur la carte, du centre vers les bords.</div>
+ <div class="rows">${items.slice(0,listLimit).map((x,k)=>x.kind==="p"?`<button class="row" data-k="${k}"><span class="eyebrow p">Producteur · ${esc(x.o.commune)}</span><b>${esc(x.o.nom)}</b><span class="meta">${x.o.bio?"Bio · ":""}${esc(x.o.cats.slice(0,3).join(", "))}${x.o.surPlace?" · vente sur place":""}</span></button>`:`<button class="row" data-k="${k}"><span class="eyebrow v">${esc(TYPES[x.o.type]||x.o.type)} · ${esc(x.o.commune)}</span><b>${esc(x.o.nom)}</b><span class="meta">${x.o.horaires?esc(x.o.horaires):"Horaires non renseignés"}</span></button>`).join("")}</div>
+ ${items.length>listLimit?`<button class="more" id="more">Afficher ${Math.min(48,items.length-listLimit)} de plus</button>`:""}${!items.length?`<p class="meta">Rien dans cette zone avec ces filtres.</p>`:""}`;
+ listInner.querySelectorAll("[data-k]").forEach(x=>x.onclick=()=>{const it=items[+x.dataset.k];setMode("map");select(it.kind,it.i)});
+ const m=document.getElementById("more");if(m)m.onclick=()=>{listLimit+=48;renderList()}}
+function setMode(m){mode=m;list.hidden=m!=="list";toggle.textContent=m==="list"?"Afficher la carte":"Afficher la liste";if(m==="list"){listLimit=48;card.hidden=true;renderList();list.scrollTop=0}else if(sel)card.hidden=false}
+toggle.onclick=()=>setMode(mode==="map"?"list":"map");
+if(window.innerWidth>760){legend.hidden=false}
+</script>
+</body>
+</html>
