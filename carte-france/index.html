@@ -48,6 +48,7 @@ body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px
 .msg{left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:140px;background:var(--surface);border:1px solid var(--vente);border-radius:10px;padding:12px;max-width:520px}
 .diag{align-self:flex-start;max-width:min(560px,100%);font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface);border-radius:8px;padding:4px 8px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .diag.bad{color:#a8322b;border:1px solid #a8322b}
+.maplibregl-ctrl-bottom-right{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
 button:focus-visible,input:focus-visible{outline:2px solid var(--prod);outline-offset:2px}
 @media (max-width:640px){.brand{display:none}}
 </style>
@@ -139,7 +140,8 @@ function fail(step,err){const t=step+" : "+(err&&err.message||err)+" | "+String(
 let map;
 try{map=new maplibregl.Map({container:"map",style:STYLE,center:[2.45,46.6],zoom:5.2,minZoom:4.5,maxZoom:17,attributionControl:{compact:true}})}catch(err){fail("création carte",err)}
 diag("carte créée");
-try{map.addControl(new maplibregl.NavigationControl({showCompass:false}),"right")}catch(err){fail("boutons zoom",err)}
+// Position : un coin (top-left, top-right, bottom-left, bottom-right). "right" seul faisait planter toute la page.
+try{map.addControl(new maplibregl.NavigationControl({showCompass:false}),"bottom-right")}catch(err){diag("boutons zoom : "+err.message,true)}
 // Diagnostic : toute erreur de la carte ou de la page s'affiche à l'écran (démo uniquement)
 const errs=[];function report(t){if(!t||errs.includes(t))return;errs.push(t);showMsg("Erreur : "+errs.slice(-3).join(" | "))}
 map.on("error",e=>report(String(e&&e.error&&e.error.message||e&&e.error||"erreur carte")));
