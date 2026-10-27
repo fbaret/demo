@@ -80,7 +80,8 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--prod);outline-o
 <section class="list" id="list" hidden><div class="inner" id="listInner"></div></section>
 <button class="float toggle" id="toggle">Afficher la liste</button>
 
-<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<!-- crossorigin : sans lui, le navigateur masque le détail des erreurs de la bibliothèque (« Script error. ») -->
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js" crossorigin="anonymous"></script>
 <script>
 const STYLE="https://data.geopf.fr/annexes/ressources/vectorTiles/styles/PLAN.IGN/gris.json";
 const CATS=["Bières","Céramique","Fromages","Fruits","Laine","Légumes","Miel","Pain","Plantes","Savons","Viandes","Vins"];
@@ -133,8 +134,12 @@ function draw(){
 }
 
 // ---------- Carte ----------
-const map=new maplibregl.Map({container:"map",style:STYLE,center:[2.45,46.6],zoom:5.2,minZoom:4.5,maxZoom:17,attributionControl:{compact:true}});
-map.addControl(new maplibregl.NavigationControl({showCompass:false}),"right");
+// Création protégée : une erreur ici est capturée avec son vrai message (même venant de la bibliothèque)
+function fail(step,err){const t=step+" : "+(err&&err.message||err)+" | "+String(err&&err.stack||"").split("\n").slice(0,3).join(" / ");diag(t,true);showMsg("Erreur au démarrage de la carte. "+t);throw err}
+let map;
+try{map=new maplibregl.Map({container:"map",style:STYLE,center:[2.45,46.6],zoom:5.2,minZoom:4.5,maxZoom:17,attributionControl:{compact:true}})}catch(err){fail("création carte",err)}
+diag("carte créée");
+try{map.addControl(new maplibregl.NavigationControl({showCompass:false}),"right")}catch(err){fail("boutons zoom",err)}
 // Diagnostic : toute erreur de la carte ou de la page s'affiche à l'écran (démo uniquement)
 const errs=[];function report(t){if(!t||errs.includes(t))return;errs.push(t);showMsg("Erreur : "+errs.slice(-3).join(" | "))}
 map.on("error",e=>report(String(e&&e.error&&e.error.message||e&&e.error||"erreur carte")));
