@@ -46,6 +46,13 @@ body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px
 .row{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:left;font:inherit;color:var(--fg);cursor:pointer;display:grid;gap:4px}
 .more,.zoomhere{justify-self:start;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:9px 16px;font:inherit;cursor:pointer}
 .msg{left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:140px;background:var(--surface);border:1px solid var(--vente);border-radius:10px;padding:12px;max-width:520px}
+.legend{right:max(12px,env(safe-area-inset-right,0px));top:calc(132px + env(safe-area-inset-top,0px));width:min(270px,calc(100% - 24px));box-sizing:border-box;background:var(--surface);border-radius:12px;box-shadow:var(--shadow);padding:12px;display:grid;gap:8px;font-size:13px;line-height:1.3}
+.lg-row{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:center}
+.lg-row b{font-weight:600}
+.lg-row .meta{font-size:12px}
+.lg-zoom{border-top:1px solid var(--line);padding-top:8px;font-family:var(--mono);font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;line-height:1.5}
+.lg-zoom b{color:var(--fg);font-weight:500}
+#legendBtn[aria-expanded="true"]{background:var(--fg);color:var(--surface);border-color:var(--fg)}
 .diag{align-self:flex-start;max-width:min(560px,100%);font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface);border-radius:8px;padding:4px 8px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .diag.bad{color:#a8322b;border:1px solid #a8322b}
 .maplibregl-ctrl-bottom-right{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
@@ -65,9 +72,10 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--prod);outline-o
   <button class="chip" data-layer="all" aria-pressed="true">Tout</button>
   <button class="chip" data-layer="p" aria-pressed="false"><i class="dot" style="background:var(--prod)"></i>Producteurs</button>
   <button class="chip" data-layer="v" aria-pressed="false"><i class="dot" style="background:var(--vente);border-radius:2px"></i>Points de vente</button>
+  <button class="chip" id="legendBtn" aria-expanded="false" aria-controls="legend">Légende</button>
   <span class="status" id="status">300 000 producteurs · 80 000 points de vente · fictifs</span>
  </div>
- <div class="diag" id="diag">démarrage…</div>
+ <div class="diag" id="diag" hidden></div>
 </div>
 <script>
 // Témoin d'erreur posé avant tout autre script : visible même si le script principal s'arrête
@@ -76,6 +84,14 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--prod);outline-o
  window.addEventListener("error",function(e){show((e.message||"erreur")+(e.lineno?" (ligne "+e.lineno+")":"")+(e.filename&&e.filename.indexOf("maplibre")>=0?" [maplibre]":""))});
  window.addEventListener("unhandledrejection",function(e){show(String(e.reason&&e.reason.message||e.reason))});})();
 </script>
+<aside class="float legend" id="legend" hidden aria-label="Légende">
+ <div class="lg-row"><svg width="22" height="22" aria-hidden="true"><circle cx="11" cy="11" r="6" fill="#2f6b3a" stroke="#fff" stroke-width="2"/></svg><span><b>Producteur</b><br><span class="meta">placé à son lieu d'origine</span></span></div>
+ <div class="lg-row"><svg width="22" height="22" aria-hidden="true"><rect x="6" y="6" width="10" height="10" transform="rotate(45 11 11)" fill="#b4621f" stroke="#fff" stroke-width="1.5"/></svg><span><b>Point de vente</b><br><span class="meta">marché, AMAP, épicerie, supermarché, coopérative</span></span></div>
+ <div class="lg-row"><svg width="22" height="22" aria-hidden="true"><circle cx="11" cy="11" r="10" fill="#2f6b3a" stroke="#fff" stroke-width="2"/><text x="11" y="15" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">12</text></svg><span><b>Groupe</b><br><span class="meta">nombre regroupé dans la zone ; toucher pour se rapprocher</span></span></div>
+ <div class="lg-row"><svg width="22" height="22" aria-hidden="true"><path d="M2 18 Q 8 2 20 6" fill="none" stroke="#b4621f" stroke-width="2.2"/></svg><span><b>Toile d'un producteur</b><br><span class="meta">ses points de vente</span></span></div>
+ <div class="lg-row"><svg width="22" height="22" aria-hidden="true"><path d="M2 18 Q 8 2 20 6" fill="none" stroke="#b4621f" stroke-width="2.2" stroke-dasharray="4 3"/></svg><span><b>Toile d'un point de vente</b><br><span class="meta">les producteurs qu'on y trouve</span></span></div>
+ <div class="lg-zoom" id="lgZoom"></div>
+</aside>
 <div class="float msg" id="msg" hidden></div>
 <section class="float card" id="card" hidden></section>
 <section class="list" id="list" hidden><div class="inner" id="listInner"></div></section>
@@ -96,7 +112,13 @@ const status=document.getElementById("status"),msg=document.getElementById("msg"
 function showMsg(t){msg.textContent=t;msg.hidden=!t}
 // Diagnostic visible (démo) : dernières étapes et erreurs, affichées sous les filtres
 const diagLog=[];
-function diag(t,err){diagLog.push((err?"⚠ ":"")+t);const el=document.getElementById("diag");if(el){el.textContent=diagLog.slice(-4).join(" · ");el.hidden=false;el.classList.toggle("bad",!!err||el.classList.contains("bad"))}}
+// La carte fonctionne : seules les erreurs restent affichées ; les étapes normales sont gardées en mémoire (diagLog)
+function diag(t,err){diagLog.push((err?"⚠ ":"")+t);if(!err)return;const el=document.getElementById("diag");if(el){el.textContent=diagLog.filter(x=>x.startsWith("⚠")).slice(-3).join(" · ");el.hidden=false;el.classList.add("bad")}}
+
+// ---------- Réglage : zoom à partir duquel on ne regroupe plus ----------
+// Valeur par défaut ci-dessous ; essai sans modifier le code : ajouter ?detail=11 (de 9 à 16) à l'adresse de la page.
+const ZOOM_DETAIL_DEFAUT=13;
+const ZOOM_DETAIL=(()=>{const v=parseInt(new URLSearchParams(location.search).get("detail"),10);return Number.isFinite(v)?Math.max(9,Math.min(16,v)):ZOOM_DETAIL_DEFAUT})();
 // (les erreurs de script et de carte sont affichées par report(), plus bas)
 
 // ---------- Chargement par zone ----------
@@ -106,7 +128,8 @@ function getJSON(url){if(!cache.has(url))cache.set(url,fetch(url).then(r=>{if(!r
 function lon2t(lon,z){return Math.floor((lon+180)/360*2**z)}
 function lat2t(lat,z){const r=lat*Math.PI/180;return Math.floor((1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*2**z)}
 function tilesInView(z){const b=map.getBounds();const x0=lon2t(b.getWest(),z),x1=lon2t(b.getEast(),z),y0=lat2t(Math.min(85,b.getNorth()),z),y1=lat2t(Math.max(-85,b.getSouth()),z);const out=[];for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++)out.push(x+"_"+y);return out}
-function level(){const z=Math.floor(map.getZoom()+1e-6);return z>=13?"i":Math.max(5,Math.min(12,z))}
+// Niveau de données : groupes précalculés pour le zoom entier courant (5 à 15), fiches individuelles à partir de ZOOM_DETAIL
+function level(){const z=Math.floor(map.getZoom()+1e-6);return z>=ZOOM_DETAIL?"i":Math.max(IDX.zmin||5,Math.min(IDX.zmax||15,z))}
 let current={level:null,p:[],v:[]};
 
 async function refresh(){
@@ -114,7 +137,7 @@ async function refresh(){
  let urls;
  if(lv==="i"){const have=new Set(IDX.i);urls=tilesInView(IDX.indivZ).filter(k=>have.has(k)).map(k=>`data/i/${k}.json`)}
  else{const have=new Set(IDX.c[lv]||[]);urls=tilesInView(lv-IDX.clusterShift).filter(k=>have.has(k)).map(k=>`data/c/${lv}/${k}.json`)}
- if(urls.length>40){urls=urls.slice(0,40)} // garde-fou : jamais plus de 40 fichiers par vue
+ if(urls.length>60){urls=urls.slice(0,60)} // garde-fou : jamais plus de 60 fichiers par vue
  status.textContent="Chargement…";
  let parts;try{parts=await Promise.all(urls.map(getJSON))}catch(e){if(g===gen){status.textContent="Erreur de chargement";showMsg("Une partie des données n'a pas pu être chargée. Rechargez la page.")}return}
  if(g!==gen)return; // une vue plus récente a pris le relais
@@ -128,8 +151,10 @@ async function refresh(){
 function draw(){
  if(!map.getSource("pc"))return;
  const lv=current.level,ind=lv==="i",showP=layerMode!=="v",showV=layerMode!=="p";
- map.getSource("pc").setData(fc(!ind&&showP?current.p.map(c=>({type:"Feature",properties:{n:c[2],t:fmt(c[2])},geometry:{type:"Point",coordinates:[c[0],c[1]]}})):[]));
- map.getSource("vc").setData(fc(!ind&&showV?current.v.map(c=>({type:"Feature",properties:{n:c[2],t:fmt(c[2])},geometry:{type:"Point",coordinates:[c[0],c[1]]}})):[]));
+ // Un « groupe » d'un seul élément s'affiche comme un marqueur simple, sans chiffre
+ map.getSource("pc").setData(fc(!ind&&showP?current.p.map(c=>({type:"Feature",properties:{n:c[2],t:c[2]>1?fmt(c[2]):""},geometry:{type:"Point",coordinates:[c[0],c[1]]}})):[]));
+ map.getSource("vc").setData(fc(!ind&&showV?current.v.map(c=>({type:"Feature",properties:{n:c[2],t:c[2]>1?fmt(c[2]):""},geometry:{type:"Point",coordinates:[c[0],c[1]]}})):[]));
+ updateLegend();
  map.getSource("pi").setData(fc(ind&&showP?current.p.map((p,i)=>({type:"Feature",properties:{i},geometry:{type:"Point",coordinates:[p[1],p[2]]}})):[]));
  map.getSource("vi").setData(fc(ind&&showV?current.v.map((v,i)=>({type:"Feature",properties:{i},geometry:{type:"Point",coordinates:[v[1],v[2]]}})):[]));
 }
@@ -160,8 +185,8 @@ function addLayers(){
  const font=styleFont();
  map.addImage("losange",diamond("#b4621f",36),{pixelRatio:2});map.addImage("losange-g",diamond("#b4621f",64),{pixelRatio:2});
  ["pc","vc","pi","vi","toile","toile-pts"].forEach(s=>map.addSource(s,{type:"geojson",data:fc([])}));
- map.addLayer({id:"vc",type:"symbol",source:"vc",layout:{"icon-image":"losange-g","icon-size":["step",["get","n"],0.8,20,1,200,1.25,2000,1.5],"icon-allow-overlap":true,"text-field":["get","t"],"text-font":font,"text-size":11,"text-allow-overlap":true},paint:{"text-color":"#fff"}});
- map.addLayer({id:"pc",type:"circle",source:"pc",paint:{"circle-color":"#2f6b3a","circle-radius":["step",["get","n"],11,20,14,200,18,2000,23,10000,28],"circle-stroke-width":2.5,"circle-stroke-color":"#fff"}});
+ map.addLayer({id:"vc",type:"symbol",source:"vc",layout:{"icon-image":"losange-g","icon-size":["step",["get","n"],0.5,2,0.8,20,1,200,1.25,2000,1.5],"icon-allow-overlap":true,"text-field":["get","t"],"text-font":font,"text-size":11,"text-allow-overlap":true},paint:{"text-color":"#fff"}});
+ map.addLayer({id:"pc",type:"circle",source:"pc",paint:{"circle-color":"#2f6b3a","circle-radius":["step",["get","n"],6,2,11,20,14,200,18,2000,23,10000,28],"circle-stroke-width":2.5,"circle-stroke-color":"#fff"}});
  map.addLayer({id:"pc-n",type:"symbol",source:"pc",layout:{"text-field":["get","t"],"text-font":font,"text-size":12,"text-allow-overlap":true},paint:{"text-color":"#fff"}});
  map.addLayer({id:"vi",type:"symbol",source:"vi",layout:{"icon-image":"losange","icon-allow-overlap":true}});
  map.addLayer({id:"pi",type:"circle",source:"pi",paint:{"circle-color":"#2f6b3a","circle-radius":6,"circle-stroke-width":1.8,"circle-stroke-color":"#fff"}});
@@ -175,6 +200,15 @@ function addLayers(){
 }
 // Données rechargées à la fin de chaque mouvement : les regroupements ne changent qu'au changement de palier
 map.on("moveend",refresh);
+
+// ---------- Légende ----------
+const legend=document.getElementById("legend"),legendBtn=document.getElementById("legendBtn"),lgZoom=document.getElementById("lgZoom");
+function setLegend(open){legend.hidden=!open;legendBtn.setAttribute("aria-expanded",open)}
+legendBtn.onclick=()=>setLegend(legend.hidden);
+setLegend(window.innerWidth>760); // ouverte par défaut sur grand écran, repliée sur téléphone
+function updateLegend(){if(!map||!lgZoom)return;const z=map.getZoom();
+ lgZoom.innerHTML=`Zoom actuel <b>${z.toFixed(1).replace(".",",")}</b><br>${z>=ZOOM_DETAIL?"Fiches individuelles":"Regroupé"} · détail à partir du zoom <b>${ZOOM_DETAIL}</b>${ZOOM_DETAIL!==ZOOM_DETAIL_DEFAUT?" (réglé par l'adresse)":""}`}
+map.on("zoom",updateLegend);
 getJSON("data/index.json").then(j=>{IDX=j;diag("index chargé");refresh()}).catch(e=>{diag("index : "+e.message,true);showMsg("Index des données introuvable.")});
 
 function setDim(on){if(!map.getLayer("pc"))return;const o=on?0.25:1;
@@ -197,11 +231,11 @@ function select(it,fly=true){
  card.querySelector(".close").onclick=()=>select(null);
  card.querySelectorAll("[data-at]").forEach(b=>b.onclick=()=>{const[lo,la]=b.dataset.at.split(",").map(Number);openAt([lo,la],it.kind==="p"?"v":"p")});
  if(fly&&ends.length){const b=new maplibregl.LngLatBounds(it.pos,it.pos);ends.forEach(o=>b.extend(o.pos));const wide=window.innerWidth>640;
-  map.fitBounds(b,{padding:{top:150,bottom:wide?90:Math.min(window.innerHeight*.5,340),left:wide?420:40,right:60},maxZoom:14,minZoom:13,duration:matchMedia("(prefers-reduced-motion: reduce)").matches?0:700})}
+  map.fitBounds(b,{padding:{top:150,bottom:wide?90:Math.min(window.innerHeight*.5,340),left:wide?420:40,right:60},maxZoom:Math.max(14,ZOOM_DETAIL+1),duration:matchMedia("(prefers-reduced-motion: reduce)").matches?0:700})}
 }
 // Ouvre l'élément situé à une position (cliqué depuis une fiche) une fois sa zone chargée
 let pending=null;
-function openAt(pos,kind){pending={pos,kind};map.easeTo({center:pos,zoom:Math.max(13.5,map.getZoom())})}
+function openAt(pos,kind){pending={pos,kind};map.easeTo({center:pos,zoom:Math.max(ZOOM_DETAIL+0.3,map.getZoom())})}
 map.on("idle",()=>{if(!pending||current.level!=="i")return;const{pos,kind}=pending;pending=null;
  const arr=kind==="p"?current.p:current.v;const f=arr.find(r=>Math.abs(r[1]-pos[0])<1e-5&&Math.abs(r[2]-pos[1])<1e-5);if(f)select(kind==="p"?asProd(f):asVente(f),true)});
 function prodCard(p){const links=[...p.links].sort((a,b)=>KM(p.pos,a)-KM(p.pos,b));
@@ -216,7 +250,9 @@ function venteCard(v){const ps=[...v.prods].sort((a,b)=>KM(v.pos,a)-KM(v.pos,b))
 
 map.on("click","pi",e=>select(asProd(current.p[e.features[0].properties.i])));
 map.on("click","vi",e=>select(asVente(current.v[e.features[0].properties.i])));
-const zoomIn=e=>map.easeTo({center:e.features[0].geometry.coordinates,zoom:Math.min(13.2,Math.floor(map.getZoom())+2)});
+// Toucher un groupe : on se rapproche de deux niveaux ; un élément seul : on va directement au niveau détail pour ouvrir sa fiche
+const zoomIn=e=>{const f=e.features[0],seul=f.properties.n<=1;
+ map.easeTo({center:f.geometry.coordinates,zoom:seul?ZOOM_DETAIL+0.3:Math.min(ZOOM_DETAIL+0.3,Math.floor(map.getZoom())+2)})};
 map.on("click","pc",zoomIn);map.on("click","vc",zoomIn);
 map.on("click",e=>{if(!sel)return;const hit=map.queryRenderedFeatures(e.point,{layers:["pc","vc","pi","vi","toile-p","toile-v"].filter(l=>map.getLayer(l))});if(!hit.length)select(null)});
 ["pc","vc","pi","vi"].forEach(l=>{map.on("mouseenter",l,()=>map.getCanvas().style.cursor="pointer");map.on("mouseleave",l,()=>map.getCanvas().style.cursor="")});
@@ -238,7 +274,7 @@ function renderList(){const b=map.getBounds(),c=map.getCenter().toArray(),inB=(l
   const np=layerMode!=="v"?current.p.filter(g=>inB(g[0],g[1])).reduce((s,g)=>s+g[2],0):0,nv=layerMode!=="p"?current.v.filter(g=>inB(g[0],g[1])).reduce((s,g)=>s+g[2],0):0;
   listInner.innerHTML=`<h2>Environ ${np.toLocaleString("fr-FR")} producteurs et ${nv.toLocaleString("fr-FR")} points de vente dans cette zone</h2>
   <div class="meta">La zone est trop large pour une liste lisible. Rapprochez-vous pour voir chaque fiche.</div><button class="zoomhere" id="zh">Me rapprocher ici</button>`;
-  document.getElementById("zh").onclick=()=>{setMode("map");map.easeTo({zoom:13.2})};return}
+  document.getElementById("zh").onclick=()=>{setMode("map");map.easeTo({zoom:ZOOM_DETAIL+0.3})};return}
  const items=[...(layerMode!=="v"?current.p.filter(p=>inB(p[1],p[2])).map(asProd):[]),...(layerMode!=="p"?current.v.filter(v=>inB(v[1],v[2])).map(asVente):[])].sort((a,z)=>KM(c,a.pos)-KM(c,z.pos));
  const np=items.filter(i=>i.kind==="p").length,nv=items.length-np;
  listInner.innerHTML=`<h2>${np} producteur${np>1?"s":""} et ${nv} point${nv>1?"s":""} de vente dans cette zone</h2>
