@@ -105,7 +105,7 @@ async function refresh(){
  current={level:lv,p:parts.flatMap(d=>d.p),v:parts.flatMap(d=>d.v)};
  draw();
  const np=lv==="i"?current.p.length:current.p.reduce((s,c)=>s+c[2],0),nv=lv==="i"?current.v.length:current.v.reduce((s,c)=>s+c[2],0);
- status.textContent=`${fmt(np)} producteurs · ${fmt(nv)} points de vente chargés`;
+ status.textContent=`${fmt(np)} producteurs · ${fmt(nv)} points de vente chargés`+(map.getSource("pc")?"":" (carte pas prête)");
  if(mode==="list")renderList();
 }
 function draw(){
@@ -120,7 +120,10 @@ function draw(){
 // ---------- Carte ----------
 const map=new maplibregl.Map({container:"map",style:STYLE,center:[2.45,46.6],zoom:5.2,minZoom:4.5,maxZoom:17,attributionControl:{compact:true}});
 map.addControl(new maplibregl.NavigationControl({showCompass:false}),"right");
-map.on("error",e=>{const m=String(e&&e.error&&e.error.message||"");if(/geopf|style|Failed to fetch/i.test(m))showMsg("Le fond Plan IGN n'a pas pu être chargé : "+m)});
+// Diagnostic : toute erreur de la carte ou de la page s'affiche à l'écran (démo uniquement)
+const errs=[];function report(t){if(!t||errs.includes(t))return;errs.push(t);showMsg("Erreur : "+errs.slice(-3).join(" | "))}
+map.on("error",e=>report(String(e&&e.error&&e.error.message||e&&e.error||"erreur carte")));
+window.addEventListener("error",e=>report(e.message));window.addEventListener("unhandledrejection",e=>report(String(e.reason&&e.reason.message||e.reason)));
 function styleFont(){for(const l of map.getStyle().layers){const f=l.layout&&l.layout["text-font"];if(Array.isArray(f)&&typeof f[0]==="string")return f}return["Open Sans Regular"]}
 function diamond(color,size){const c=document.createElement("canvas");c.width=c.height=size;const x=c.getContext("2d");x.translate(size/2,size/2);x.rotate(Math.PI/4);const s=size*0.6;x.fillStyle=color;x.strokeStyle="#fff";x.lineWidth=size*0.08;x.fillRect(-s/2,-s/2,s,s);x.strokeRect(-s/2,-s/2,s,s);return x.getImageData(0,0,size,size)}
 map.on("style.load",()=>{
